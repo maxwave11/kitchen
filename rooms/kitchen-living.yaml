@@ -43,8 +43,26 @@ design:
   objectives: []
 
 built_ins: []
-windows: []      # TODO: 1 window — wall, position from wall start, width, sill_height, height
-openings: []     # TODO: 2 doorways — wall, position, width, height, to, has_door, swing, hinge
+windows:
+  # Wall confirmed by Maxim (opposite the doorway). Position/size are PLACEHOLDERS (centered, typical size).
+  - id: window
+    wall: D-A
+    position: 78        # TODO: cm from corner D to window edge (placeholder = centered)
+    width: 150          # TODO
+    sill_height: 85     # TODO
+    height: 150         # TODO
+    type: casement
+openings:
+  # Wall confirmed by Maxim. Position/size are PLACEHOLDERS (centered, standard door).
+  - id: door-1
+    wall: B-C
+    position: 113       # TODO: cm from corner B to opening edge (placeholder = centered)
+    width: 80           # TODO
+    height: 210         # TODO
+    to: ""              # TODO: where it leads
+    has_door: true      # TODO
+    swing: in           # TODO
+  # TODO: second doorway — wall/position/size unknown
 outlets: []
 heating: []
 plumbing: []     # TODO: water supply / drain riser, ventilation, gas
@@ -59,4 +77,5 @@ accessories: []
 
 notes: |
   2026-11-07: overall size from Maxim: 5.362 m x 3.061 m, ceiling 2.7 m.
-  TODO: window, two door openings, utilities, official area.
+  2026-11-07: doorway on wall B-C, window on opposite wall D-A (Maxim). Positions/sizes still placeholders.
+  TODO: exact window/door positions and sizes, second doorway, utilities, official area.

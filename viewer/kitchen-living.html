@@ -46,7 +46,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-const R = {"name": "Кухня-гостиная", "area_m2": 16.41, "ceiling": 270.0, "thickness": 12.0, "walls": [{"id": "A-B", "a": [0, 0], "b": [536.2, 0.0], "length": 536.2}, {"id": "B-C", "a": [536.2, 0.0], "b": [536.2, 306.1], "length": 306.1}, {"id": "C-D", "a": [536.2, 306.1], "b": [0.0, 306.1], "length": 536.2}, {"id": "D-A", "a": [0.0, 306.1], "b": [0, 0], "length": 306.1}], "holes": [], "builtins": [], "furniture": [], "lights": [], "zones": [], "warnings": []};
+const R = {"name": "Кухня-гостиная", "area_m2": 16.41, "ceiling": 270.0, "thickness": 12.0, "walls": [{"id": "A-B", "a": [0, 0], "b": [536.2, 0.0], "length": 536.2}, {"id": "B-C", "a": [536.2, 0.0], "b": [536.2, 306.1], "length": 306.1}, {"id": "C-D", "a": [536.2, 306.1], "b": [0.0, 306.1], "length": 536.2}, {"id": "D-A", "a": [0.0, 306.1], "b": [0, 0], "length": 306.1}], "holes": [{"kind": "window", "id": "window", "wall": "D-A", "position": 78.0, "width": 150.0, "sill": 85.0, "height": 150.0, "subtype": "casement"}, {"kind": "opening", "id": "door-1", "wall": "B-C", "position": 113.0, "width": 80.0, "sill": 0, "height": 210.0, "has_door": true, "swing": "in", "hinge": "start", "to": ""}], "builtins": [], "furniture": [], "lights": [], "zones": [], "warnings": []};
 const S = 0.01;                                    // cm -> m
 const P = (x, y, z = 0) => new THREE.Vector3(x * S, z * S, -y * S);   // plan (x east, y north, z up)
 
