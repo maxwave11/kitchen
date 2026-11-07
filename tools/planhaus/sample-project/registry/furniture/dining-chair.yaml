@@ -1,0 +1,39 @@
+# Kave Home Skie Chair
+
+name: "Kave Home Skie Dining Chair"
+url: "https://kavehome.com/es/en/skie-chair"
+price: 149
+currency: EUR
+
+status: installed
+
+category: dining_chair
+
+dimensions:
+  width: 52
+  depth: 56
+  height: 78
+
+mass: 5
+seat_height: 46
+
+materials: [solid beech frame, cord weave seat]
+colors: [natural beech, beige cord]
+finish: "clear lacquer"
+style: [mediterranean]
+
+palette_role: secondary
+visual_weight: light
+
+description: |
+  Lightweight dining chair with woven cord seat and backrest.
+  Solid beech frame, natural finish. The cord weave has a visible
+  handcrafted texture with slight irregularities.
+
+  Open frame, slim section members. Stackable for storage.
+
+image: ""
+
+notes: |
+  Need 4 for dining table. 4 × €149 = €596.
+  Cord seat comfortable for 1-2hr dinners.

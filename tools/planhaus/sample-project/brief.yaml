@@ -1,0 +1,80 @@
+# DESIGN BRIEF
+
+about_us: |
+  Couple, early 30s, no kids, one cat.
+  Both work from home 2-3 days/week (laptops only, no external monitors).
+  Friends over for dinner 1-2x/month.
+  Rental: yes, 2-3 year stay.
+
+mood: |
+  Warm, calm, Mediterranean — with one or two statement moments.
+  Not Airbnb-generic. Lived-in but curated.
+
+taste: |
+  LOVE:
+  - Natural materials (wood, linen, stone, ceramic)
+  - Warm lighting layers (no overhead-only)
+  - Mediterranean character (terracotta, white walls, warm tones)
+  - Plants as design elements
+
+  HATE:
+  - Cold LED-only lighting
+  - Glossy/plastic furniture
+  - Generic "modern minimalist" without warmth
+  - Cluttered surfaces
+
+  WORK SETUP REQUIREMENTS:
+  - Laptop-only, no dedicated desk needed
+  - Good light for video calls from the sofa/dining area
+
+  CHALLENGE:
+  - Small space (~60m²) must feel spacious, not cramped
+  - Rental: can't modify walls or floors
+
+priorities: |
+  Must have:
+  - Comfortable sofa for lounging + WFH
+  - Good dining area for 4
+  - Proper lighting (layered)
+
+  Important:
+  - Storage without visual clutter
+  - Bedroom feels restful (not a storage room)
+  - Coherent material palette across rooms
+
+  Nice to have:
+  - One statement piece (lighting or art)
+  - Reading nook or corner
+  - Balcony integration
+
+budget:
+  total: 12000
+  currency: EUR
+  notes: |
+    Quality level:
+    Mid-range baseline (Kave Home / Zara Home), splurge on 1-2 hero pieces.
+
+    Where to splurge:
+    - Sofa (daily use, comfort matters)
+    - Main pendant light (statement piece)
+
+    Where to save:
+    - Side tables, shelving
+    - Bedroom basics
+    - Accessories
+
+constraints: |
+  Things we can't change:
+  - White tile floors throughout
+  - White walls (can repaint at move-out)
+  - Built-in kitchen (white laminate, basic)
+  - Bathroom fixtures
+
+shops:
+  - url: "https://kavehome.com/es"
+  - url: "https://zarahome.com"
+  - url: "https://sweeek.es"
+
+references:
+  - url: ""
+    notes: "Mediterranean warm modern — think rural Málaga finca meets clean Scandinavian lines"

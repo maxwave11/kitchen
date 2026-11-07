@@ -1,0 +1,35 @@
+# Kave Home Yoana Coffee Table
+
+name: "Kave Home Yoana Coffee Table"
+url: "https://kavehome.com/es/en/yoana-coffee-table"
+price: 349
+currency: EUR
+
+status: installed
+
+category: coffee_table
+
+dimensions:
+  width: 110
+  depth: 60
+  height: 35
+
+mass: 18
+
+materials: [walnut veneer, solid walnut legs]
+colors: [walnut]
+finish: "matte lacquer"
+style: [midcentury]
+
+palette_role: secondary
+visual_weight: light
+
+description: |
+  Oval-ish rectangular coffee table with softly rounded corners.
+  Walnut veneer top on splayed solid walnut legs, 35cm tall.
+  Warm mid-brown tone with visible grain.
+
+image: ""
+
+notes: |
+  Also available in oak.

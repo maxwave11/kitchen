@@ -1,0 +1,38 @@
+# Kave Home Wayna Floor Lamp
+
+name: "Kave Home Wayna Floor Lamp"
+url: "https://kavehome.com/es/en/wayna-floor-lamp"
+price: 129
+currency: EUR
+
+status: installed
+
+category: floor_lamp
+
+dimensions:
+  width: 35
+  depth: 35
+  height: 150
+
+mass: 4
+lumens: 806
+color_temp_k: 2700
+
+materials: [steel, linen shade]
+colors: [black base, natural linen]
+finish: "matte powder coat"
+style: [modern]
+
+palette_role: dominant   # the linen shade carries the dominant band; black stem reads neutral
+visual_weight: light
+
+description: |
+  Slim floor lamp with linen drum shade on matte black steel stem.
+  Arc design angles light toward seating without taking floor space.
+  Warm diffused light through natural linen.
+
+image: ""
+
+notes: |
+  E27 socket, bulb not included; lumens/temp above assume an 806lm
+  2700K dimmable LED. Foot switch on the cord.

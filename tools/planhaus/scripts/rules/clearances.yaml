@@ -1,0 +1,198 @@
+# planhaus canonical clearance & proportion rules
+#
+# Single source of truth for all numeric design checks. Skills cite rule IDs
+# from this file; they do not restate numbers. Consumed by room_spatial.py --check.
+#
+# Severity semantics (unless a rule overrides via `severity:` or explicit
+# max/error fields):
+#   - measured < min_cm                      -> ERROR
+#   - min_cm <= measured < ideal_cm          -> WARN
+#   - ideal ranges (ideal_range_cm etc.) violated -> WARN unless noted
+#   - missing data                           -> SKIP (never an error)
+#
+# `applies` is one of: circulation | pair | item | room | proportion
+
+rules:
+  - id: CIRC-01
+    name: "Main circulation route"
+    applies: circulation
+    min_cm: 60
+    ideal_cm: 90
+    notes: "Widest free corridor between each pair of openings (doors, balcony doors)."
+    source: "Lifetime Homes 900mm; Karlen, Space Planning Basics"
+
+  - id: CIRC-02
+    name: "Secondary path between furniture pieces"
+    applies: circulation
+    min_cm: 60
+    ideal_cm: 75
+    notes: "Applies to declared circulation: routes in the room YAML."
+    source: "Karlen, Space Planning Basics; Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: SEAT-01
+    name: "Sofa/armchair to coffee table gap"
+    applies: pair
+    min_cm: 30
+    ideal_range_cm: [35, 46]
+    warn_above_cm: 50          # > 50 -> WARN "out of reach"
+    notes: "Knee room below 30; above 50 the table is out of reach from the seat."
+    source: "NKBA Kitchen/Bath Planning Guidelines; Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: SEAT-02
+    name: "Conversation seats max spacing"
+    applies: pair
+    max_ideal_cm: 300          # seat-to-seat in same zone; above -> WARN
+    error_above_cm: 360        # > 360 -> ERROR
+    notes: "Seat-to-seat distance within a conversation zone."
+    source: "Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: DIN-01
+    name: "Dining table edge to obstruction (seated side)"
+    applies: pair
+    min_cm: 75
+    ideal_cm: 90
+    notes: "Pull-out only: room to push a chair back and stand."
+    source: "NKBA Kitchen/Bath Planning Guidelines; Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: DIN-02
+    name: "Dining table edge to obstruction (circulation side)"
+    applies: pair
+    min_cm: 90
+    ideal_cm: 122
+    notes: "When a circulation route passes behind seated diners."
+    source: "NKBA Kitchen/Bath Planning Guidelines"
+
+  - id: BED-01
+    name: "Bed side clearance (each used side)"
+    applies: pair
+    min_cm: 60
+    ideal_cm: 75
+    ideal_queen_cm: 76
+    ideal_king_cm: 91
+    notes: "Per used side of the bed (a side against a wall is unused)."
+    source: "Panero & Zelnik, Human Dimension & Interior Space; Karlen, Space Planning Basics"
+
+  - id: BED-02
+    name: "Bed foot clearance (if passage)"
+    applies: pair
+    min_cm: 60
+    ideal_cm: 90
+    notes: "Only when the foot of the bed is part of a walking path."
+    source: "Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: TV-01
+    name: "TV viewing distance vs diagonal"
+    applies: item
+    min_ratio: 1.0             # distance / diagonal; below -> ERROR
+    ideal_ratio_range: [1.2, 2.5]   # outside -> WARN (4K default)
+    notes: "Needs screen_diagonal_in on the TV item or its registry. Measured to the
+      nearest viewing seat: a sofa/armchair inside the screen's ±60° cone and turned
+      no more than ~45° away from it. No viewing seat -> SKIP (TV not positioned for
+      primary viewing)."
+    source: "RTINGS/THX TV distance guidelines"
+
+  - id: KIT-01
+    name: "Kitchen work aisle (counter-facing)"
+    applies: pair
+    min_cm: 91
+    ideal_cm: 107
+    notes: "Free aisle in front of kitchen counters / islands."
+    source: "NKBA Kitchen/Bath Planning Guidelines"
+
+  - id: DOOR-01
+    name: "Door swing arc clear"
+    applies: item
+    severity_both_blocked: ERROR   # room YAML does not declare the hinge side,
+    severity_one_blocked: WARN     # so ERROR only when BOTH possible swings are blocked
+    notes: "Quarter-circle swing (radius = opening width) for has_door: true openings,
+      tried from both hinge positions. One side blocked -> WARN naming the free hinge;
+      both blocked -> ERROR."
+    source: "Karlen, Space Planning Basics"
+
+  - id: WIN-01
+    name: "Access to operable windows / balcony doors"
+    applies: item
+    min_cm: 60
+    ideal_cm: 75
+    notes: "Clear approach rectangle in front of each operable window or balcony door.
+      Windows declared `type: fixed` (or `non-operable`) are exempt (SKIP) — e.g. a
+      fixed pane above a kitchen counter."
+    source: "Panero & Zelnik, Human Dimension & Interior Space; Karlen, Space Planning Basics"
+
+  - id: HEAT-01
+    name: "Radiator not blocked"
+    applies: pair
+    min_cm: 15
+    ideal_cm: 30
+    severity: WARN             # WARN only, never ERROR
+    notes: "Furniture in front of a radiator chokes convection."
+    source: "Panero & Zelnik, Human Dimension & Interior Space"
+
+  - id: LIGHT-01
+    name: "Pendant above table surface"
+    applies: item
+    min_cm: 76
+    ideal_range_cm: [76, 91]
+    notes: "hang_height_cm = pendant BOTTOM above the finished floor (cm).
+      Checked distance = hang_height_cm minus the table height underneath;
+      only checked if hang_height_cm is given."
+    source: "NKBA Kitchen/Bath Planning Guidelines"
+
+  - id: PROP-01
+    name: "Sofa length vs its wall"
+    applies: proportion
+    min_pct: 50
+    ideal_range_pct: [60, 75]
+    warn_above_pct: 85         # > 85% -> WARN "wall overloaded"
+    notes: "Sofa width as share of the wall its back is nearest to (2/3 rule)."
+    source: "Apartment Therapy 2/3 rule"
+
+  - id: PROP-02
+    name: "Coffee table vs sofa length"
+    applies: proportion
+    min_pct: 40
+    ideal_range_pct: [55, 75]
+    notes: "Coffee table width as share of sofa width (2/3 rule)."
+    source: "Apartment Therapy 2/3 rule"
+
+  - id: RUG-01
+    name: "Living rug bare-floor border to walls"
+    applies: item
+    min_cm: 20
+    ideal_range_cm: [30, 60]
+    notes: "Only checked when a rug item has dimensions and a position."
+    source: "Emily Henderson rug rules"
+
+  - id: RUG-02
+    name: "Dining rug extends beyond table"
+    applies: item
+    min_cm: 50
+    ideal_cm: 61
+    notes: "Rug border past the table edge on each side, so chairs stay on the rug."
+    source: "Emily Henderson rug rules"
+
+  - id: ZONE-01
+    name: "Zone bounds contain member bboxes"
+    applies: item
+    tolerance_cm: 10           # overflow beyond this -> WARN
+    severity: WARN
+    notes: "Furniture assigned to a zone (zone: <id>) should sit inside that zone's
+      declared bounds; small overhangs up to the tolerance are fine."
+    source: "Karlen, Space Planning Basics (block planning)"
+
+  - id: SIGHT-01
+    name: "Focal point visible from openings"
+    applies: room
+    blocker_height_cm: 75      # items taller than this block a sightline
+    severity: WARN
+    notes: "Straight sightline from each opening midpoint to focal_point.ref;
+      items above the blocker height interrupt it. Height unknown -> SKIP."
+    source: "Karlen, Space Planning Basics (entry sight lines)"
+
+  - id: GEOM-01
+    name: "Geometry validity (collisions, bounds)"
+    applies: room
+    severity: ERROR
+    notes: "Overlapping items and out-of-bounds furniture from the base validator,
+      surfaced as findings under --check (always ERROR)."
+    source: "planhaus base validator"

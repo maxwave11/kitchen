@@ -1,0 +1,84 @@
+# Design Integration Checklist
+# Run after design changes (used by /planhaus-review). Consider the whole, not just individual items.
+# Numeric clearances are NOT restated here — run the rules engine (/planhaus-validate)
+# and cite findings by rule ID from the plugin's scripts/rules/clearances.yaml.
+
+# ============================================================================
+# PER ROOM - Consider each room individually
+# ============================================================================
+
+per_room:
+  density:
+    consider: "Does the room feel balanced - not cramped, not empty?"
+    metric: "Floor coverage = sum(furniture footprint) / room area"
+    target: "20-40% living rooms; 30-50% bedrooms. Outside the band = explain or fix."
+
+  focal_point:
+    consider: "Is there one clear thing that draws the eye? Or competing elements?"
+    check: "Room YAML declares focal_point: and sightlines to it stay clear"
+
+  flow:
+    consider: "Can you move through naturally? Or does the layout fight you?"
+    check: "Rules engine passes CIRC-01 (main routes) and CIRC-02 (declared secondary paths) — cite the rule IDs, don't eyeball"
+
+  light:
+    consider: "Is there enough light for what happens here?"
+
+  lighting_layers:
+    consider: "Does every zone get the layers it needs, at one consistent warmth?"
+    check: "All layers_required from concept.yaml present in the room (layer: on fixtures); color_temp_k consistent across fixtures"
+
+  breathing_room:
+    consider: "Do key pieces have space around them, or are they squeezed?"
+
+# ============================================================================
+# PER APARTMENT - Consider connections and coherence
+# ============================================================================
+
+per_apartment:
+  material_palette:
+    consider: "Do materials repeat intentionally? Or is it chaotic?"
+    metric: "Count unique materials - aim for 3-5 main ones (the concept.yaml master list)"
+
+  palette_roles:
+    consider: "Is the 60-30-10 discipline real, or just claimed?"
+    check: "Every significant item has a palette_role (dominant/secondary/accent) consistent with concept.yaml; accent items stay near 10% of the visual field — no accent role exceeding 10%"
+
+  transitions:
+    consider: "Do adjacent rooms feel connected? Or jarring at thresholds?"
+
+  sightlines:
+    consider: "What do you see through openings? Does it compose well?"
+
+  style_thread:
+    consider: "Is there a clear identity? Would client recognize their brief?"
+
+  hierarchy:
+    consider: "What's the most important room? Does design emphasis match concept.yaml room_hierarchy?"
+
+# ============================================================================
+# QUESTIONS TO ASK
+# ============================================================================
+
+questions:
+  - "What story does this apartment tell about who lives here?"
+  - "Is there a quiet moment in each room, or is everything shouting?"
+  - "What would you change if you had to remove one item?"
+  - "What's missing that would complete the vision?"
+
+# ============================================================================
+# TOOL COMMANDS
+# ============================================================================
+
+commands:
+  brief: "/planhaus-brief"
+  concept: "/planhaus-concept"
+  zone: "/planhaus-zone <room>"
+  furnish: "/planhaus-furnish <room>"
+  select: "/planhaus-select <room>"
+  light: "/planhaus-light <room>"
+  validate: "/planhaus-validate <room>"      # geometry + rules engine, cites rule IDs
+  render: "/planhaus-render <room>"
+  positions: "/planhaus-position <room>"
+  distances: "/planhaus-position <room> --matrix"
+  review: "/planhaus-review apartment"

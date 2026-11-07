@@ -1,0 +1,93 @@
+# DESIGN BRIEF
+
+about_us: |
+  # Who lives here (facts only)?
+  # - Household: adults / kids / pets
+  # - Work-from-home: how often + equipment
+  # - Guests: who + frequency
+  # - Rental plans: yes/no + duration
+  #
+  # Example:
+  # Couple + 2 kids + dog. WFH 3–4 days/week (MacBook + 27" screen). Guests monthly.
+
+mood: |
+  # What should it feel like?
+  # (3–6 adjectives)
+  #
+  # Example:
+  # Warm, calm, lived-in — with 1–2 statement moments.
+
+taste: |
+  LOVE:
+  -
+  # Examples:
+  # - Mediterranean character (not generic Airbnb)
+  # - Natural materials (wood/stone/linen)
+  # - Layered warm lighting
+  
+  HATE:
+  -
+  # Examples:
+  # - Generic Airbnb styling / slogan art
+  # - Cold or mixed lighting
+  # - Cheap glossy finishes
+  
+  WORK SETUP REQUIREMENTS:
+  -
+  # Example:
+  # MacBook + 27" monitor; comfortable chair; task light; no screen glare.
+  
+  CHALLENGE:
+  -
+  # Example:
+  # Views only from specific spots → layout must capture them.
+
+priorities: |
+  Must have:
+  -
+  # Examples: WFH setup; durable sofa; storage
+  
+  Important:
+  -
+  # Examples: layered lighting; good flow; sleep-friendly bedrooms
+  
+  Nice to have:
+  -
+  # Examples: wow moment; spacious feeling; TV optional
+
+budget:
+  total:          # NUMERIC total for furnishing, e.g., 25000
+                  # /planhaus-concept derives the tier allocation (anchor/supporting/accent)
+                  # and per-room budgets from this number — get a real figure, even a range midpoint.
+  currency: ""    # e.g., EUR / CZK / USD
+  notes: |
+    Quality level:
+    # e.g., “Not IKEA; Zara Home / Kave Home baseline; splurge on 1–2 hero pieces”
+    #
+    # Example:
+    # Mid-range baseline + 1–2 investment pieces; spend on sofa + lighting.
+
+    Where to splurge:
+    -
+    # Examples: sofa; lighting; one signature piece
+
+    Where to save:
+    -
+    # Examples: side tables; basic storage; accessories
+
+constraints: |
+  Things we can't change:
+  -
+  # Examples: built-in kitchen; wardrobes; floor/tile finishes
+
+shops:
+  - url: ""
+  # Example: - url: "https://kavehome.com/es"
+
+references:
+  - url: ""
+    notes: ""
+  #
+  # Example:
+  # - url: "https://andreakroupova.com/"
+  #   notes: "Warm minimalism + strong composition"

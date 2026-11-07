@@ -1,0 +1,69 @@
+# DESIGN CONCEPT — the designer's translation of the brief. One per project.
+# Written by /planhaus-concept after research. Every later phase reads this:
+# zoning takes room_hierarchy, selection takes style/palette/budget, lighting
+# takes the lighting block. Keep it decided, not aspirational.
+
+narrative: ""
+  # 2-3 sentences: the story of this home.
+  #
+  # Example:
+  # "A calm Mediterranean apartment for a working couple: warm plaster tones,
+  #  honest wood, and one strong moment per room. Daylight does the decorating;
+  #  everything else stays quiet."
+
+style:
+  primary: ""        # controlled vocab (same as catalog `style`): scandinavian, midcentury,
+                     # modern, industrial, rustic, traditional, coastal, japandi,
+                     # mediterranean, bohemian, eclectic
+  secondary: []      # 0-2 compatible styles, e.g., [japandi]
+  signals: []        # concrete, checkable cues — what makes a candidate "on style"
+                     # Examples: "tapered light-wood legs", "curved lines", "linen + boucle"
+  avoid: []          # from brief HATE + research
+                     # Examples: "chrome + glass", "slogan art", "high-gloss lacquer"
+
+# PALETTE — 60-30-10 with explicit role assignment.
+# share is % of visual field; applications says WHERE each role lives.
+palette:
+  dominant:   { share: 60, colors: [], materials: [], applications: "" }
+              # Example: colors [warm white, sand], materials [plaster, oak floor],
+              # applications: "walls, floor, large upholstery"
+  secondary:  { share: 30, colors: [], materials: [], applications: "" }
+              # Example: colors [olive, walnut brown], applications: "case goods, curtains, rug field"
+  accent:     { share: 10, colors: [], materials: [], applications: "" }
+              # Example: colors [terracotta, brass], applications: "cushions, art, lamp details"
+
+materials: []
+  # 3-5 master list — every room draws from these. Each: {name, role, rooms}
+  # Example:
+  # - { name: oak, role: dominant, rooms: [living-room, bedroom] }
+  # - { name: linen, role: secondary, rooms: [living-room, bedroom] }
+  # - { name: brass, role: accent, rooms: [living-room] }
+
+lighting:
+  philosophy: ""           # 1-2 sentences, e.g., "Layered pools of warm light, no single
+                           # ceiling source doing all the work; dim everything."
+  color_temp_k: 2700       # consistent across rooms (2700-3000 residential)
+  layers_required: [ambient, task, accent]   # every room must provide these layers
+
+budget:
+  total: 0                 # from brief.yaml budget total
+  currency: EUR
+  allocation: { anchor: 60, supporting: 25, accent: 15 }   # % per tier
+                           # anchor: sofa, bed, dining table
+                           # supporting: coffee table, chairs, rugs, lighting, storage
+                           # accent: decor, cushions, plants
+  rooms: {}                # room-id: amount — splits total across rooms
+                           # Example: { living-room: 12000, bedroom: 6000 }
+
+room_hierarchy: []
+  # Ordered, most important first. Design emphasis (and budget) follows this order.
+  # Each: {room, emphasis, why}
+  # Example:
+  # - { room: living-room, emphasis: high, why: "Where guests land; holds the one wow moment" }
+  # - { room: bedroom, emphasis: medium, why: "Sleep quality over show" }
+
+references: []
+  # Researched references with the takeaway that informed this concept.
+  # Each: {url, takeaway}
+  # Example:
+  # - { url: "https://andreakroupova.com/", takeaway: "Warm minimalism; one sculptural piece per room" }

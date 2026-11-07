@@ -1,0 +1,86 @@
+# DESIGN CONCEPT — Casa Sol
+# The designer's translation of brief.yaml. Zoning takes room_hierarchy,
+# selection takes style/palette/budget, lighting takes the lighting block.
+
+narrative: |
+  A calm Mediterranean apartment for a working couple: white walls and tile
+  stay quiet, warm wood and linen carry the texture, and one brass moment
+  per room does the talking. Daylight from the south balcony does the
+  decorating; the layout keeps every path to it open.
+
+style:
+  primary: mediterranean
+  secondary: [scandinavian]
+  signals:
+    - "natural linen and woven cord textures"
+    - "warm mid-tone wood: walnut, oak, ash, beech in the same family"
+    - "rounded corners and clean, low-profile lines"
+    - "matte ceramic and terracotta surfaces"
+    - "brushed brass details, never chrome"
+  avoid:
+    - "chrome + glass combinations"
+    - "glossy or plastic furniture"
+    - "cold white LED light"
+    - "generic minimalism without texture"
+    - "cluttered surfaces"
+
+# PALETTE — 60-30-10 with explicit role assignment.
+# Role calls that the registry stays silent about (registry = objective specs):
+# the beige linen sofa is the 60% workhorse; walnut dining + coffee tables and
+# the oak bed carry the 30% wood layer; the brass pendant is the living room's
+# 10% jewelry moment and the terracotta lamps are the bedroom's.
+palette:
+  dominant:
+    share: 60
+    colors: [warm white, beige, sand]
+    materials: [white tile, white paint, linen]
+    applications: "walls, tile floor, sofa upholstery, curtains, bed linen"
+  secondary:
+    share: 30
+    colors: [walnut brown, natural oak, terracotta]
+    materials: [walnut, oak, beech, jute]
+    applications: "dining set, coffee table, bed frame, nightstands, rug fields"
+  accent:
+    share: 10
+    colors: [brushed brass, olive green]
+    materials: [brass, terracotta ceramic, plants]
+    applications: "dining pendant, bedside lamps, plant pots, small decor"
+
+materials:
+  - { name: linen, role: dominant, rooms: [living-room, bedroom] }
+  - { name: walnut, role: secondary, rooms: [living-room] }
+  - { name: oak, role: secondary, rooms: [bedroom] }
+  - { name: ash, role: secondary, rooms: [bedroom] }
+  - { name: terracotta ceramic, role: accent, rooms: [living-room, bedroom] }
+  - { name: brass, role: accent, rooms: [living-room] }
+
+lighting:
+  philosophy: |
+    Layered pools of warm light — pendant over dining, task spots over the
+    counter, lamps at sofa and bedside. No single ceiling source doing all
+    the work; everything dimmable. (Brief HATE: cold LED-only lighting.)
+  color_temp_k: 2700
+  layers_required: [ambient, task, accent]
+
+budget:
+  total: 12000
+  currency: EUR
+  allocation: { anchor: 60, supporting: 25, accent: 15 }
+  rooms: { living-room: 8000, bedroom: 4000 }
+  # Splurge exceptions from the brief — excluded from tier-line math, the 1.2x
+  # price gate applies to these amounts instead:
+  statement_pieces:
+    - { item: dining-pendant, room: living-room, amount: 600 }
+  # Electronics (TV) count as supporting tier. Current spend is well under the
+  # per-room split: the remainder stays unallocated for rugs, curtains, art and
+  # accessories still to be selected.
+
+room_hierarchy:
+  - { room: living-room, emphasis: high, why: "Where guests land and both work from home; holds the one wow moment (brass pendant)" }
+  - { room: bedroom, emphasis: medium, why: "Sleep quality over show — invest in the bed and bedding, keep the rest quiet" }
+
+references:
+  - url: "https://kavehome.com/es/en/inspiration"
+    takeaway: "Warm Mediterranean modern: linen + light wood + white walls, one textural statement per room"
+  - url: "https://www.zarahome.com/es/en/editorials"
+    takeaway: "Brass and terracotta read as jewelry against an all-white base — small doses only"

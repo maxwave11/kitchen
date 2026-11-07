@@ -1,0 +1,207 @@
+# BEDROOM
+
+id: bedroom
+name: "Bedroom"
+area_m2: 12.5  # official
+
+ascii: |
+  #      N
+  #      ↑
+  #    D───==────C     == north window (exterior facade)
+  #    │         │
+  #    │ Bedroom │ ← bath behind this east wall
+  #    │         │
+  #    A─==──────B     == door from hall (SW)
+
+walls:
+  - id: A-B
+    direction: east
+    length: 360
+
+  - id: B-C
+    direction: north
+    length: 350
+
+  - id: C-D
+    direction: west
+    length: 360
+
+  - id: D-A
+    direction: south
+    length: 350
+
+validation:
+  trace_closes: true
+  calculated_area: 12.60
+  area_difference_pct: 0.8
+  area_matches: true
+
+ceiling_height: 260
+
+design:
+  goal: "Restful retreat — soft, quiet palette with tactile warmth. Sleep-first room."
+  objectives:
+    - "Minimal palette: white + warm linen + light wood only"
+    - "Bed is focal point — invest in good bedding, not many accessories"
+    - "Blackout capability for sleep quality"
+    - "Warm bedside lighting, no overhead"
+    - "Keep surfaces clear — storage in wardrobe, not on nightstands"
+
+windows:
+  - id: bedroom-window
+    wall: C-D
+    position: 100
+    width: 140
+    notes: "North-facing (rear facade) — soft, even light all day; blackout liner for bright summer nights"
+
+openings:
+  - id: bedroom-door
+    wall: A-B
+    position: 10
+    width: 80
+    to: hall
+    has_door: true
+
+outlets:
+  - id: outlet-bed-left
+    wall: B-C
+    position: 285   # y=285, behind the north nightstand
+    height: 30
+    type: double
+
+  - id: outlet-bed-right
+    wall: B-C
+    position: 60    # y=60, behind the south nightstand
+    height: 30
+    type: double
+
+heating: []
+plumbing: []
+
+# ----------------------------------------------------------------------------
+# ZONING & CIRCULATION
+# ----------------------------------------------------------------------------
+
+zones:
+  - id: sleeping
+    purpose: "Sleep and reading — the room's single job"
+    anchor: bed
+    bounds: { x: [120, 360], y: [30, 320] }
+    lighting: [task, accent]
+
+  - id: dressing
+    purpose: "Planned wardrobe wall on the west side, facing the bed (piece not yet selected)"
+    anchor: wardrobe
+    bounds: { x: [0, 70], y: [100, 350] }
+    lighting: [ambient]
+
+focal_point:
+  ref: bed
+  why: "The wide oak headboard on the east wall is the first thing seen from the door — the brief invests in bedding, not accessories."
+
+# Single-opening room: there are no door-to-door routes for the engine to
+# measure (declared routes need openings/doors at both ends). The door→window
+# path runs past the foot of the bed and is covered by BED-02.
+circulation: []
+
+sightlines:
+  - from: bedroom-door
+    toward: focal_point
+    keep_clear: true
+
+lighting:
+  - id: bedside-left
+    position:
+      wall: [B-C, C-D]
+      offset: [22, 64]
+    ceiling: null
+    mount: table
+    layer: task
+    color_temp_k: 2700
+    lumens: 400
+    fixture: registry/furniture/table-lamp.yaml
+    why: "Reading light at pillow height — the brief asks for warm bedside light and no overhead."
+
+  - id: bedside-right
+    position:
+      wall: [B-C, A-B]
+      offset: [22, 63]
+    ceiling: null
+    mount: table
+    layer: task
+    color_temp_k: 2700
+    lumens: 400
+    fixture: registry/furniture/table-lamp.yaml
+    why: "Matching pair keeps the headboard wall symmetric — calm, hotel-like."
+
+  - id: headboard-accent
+    position:
+      wall: [B-C, A-B]
+      offset: [4, 175]
+    ceiling: null
+    mount: surface
+    layer: accent
+    color_temp_k: 2700
+    lumens: 250
+    fixture: null
+    why: "Soft wash on the headboard wall — the focal point carries the accent layer, on its own switch for the evening scene."
+
+furniture:
+  - id: bed
+    registry: registry/furniture/bed.yaml
+    type: bed
+    zone: sleeping
+    position:
+      wall: [B-C, A-B]
+      offset: [0, 255]
+    facing: west
+    why: "Headboard on the east wall — the interior wall, so the north window stays unblocked and both sides keep equal clearance; first thing seen from the door."
+
+  - id: nightstand-left
+    registry: registry/furniture/nightstand.yaml
+    type: nightstand
+    zone: sleeping
+    position:
+      wall: [B-C, C-D]
+      offset: [50, 86]
+    orientation: E-W
+    why: "Arm's reach from the pillow on the window side; lamp + one book — surfaces stay clear per the brief."
+
+  - id: nightstand-right
+    registry: registry/furniture/nightstand.yaml
+    type: nightstand
+    zone: sleeping
+    position:
+      wall: [B-C, A-B]
+      offset: [50, 33]
+    orientation: E-W
+    why: "Mirrors the left nightstand for symmetry at the headboard wall."
+
+accessories:
+  - id: bedroom-rug
+    type: area-rug
+    location: "Under bed, extending 60cm on each side"
+    notes: "Soft wool, ~160x230cm, off-white or light beige"
+
+  - id: curtains
+    type: window-treatment
+    location: "Bedroom window"
+    notes: "Linen curtains, natural color + blackout liner"
+
+notes: |
+  Simple rectangular room. Bed headboard on the east wall (interior — the
+  bath's service side; the apartment's north and west walls are facade).
+  Nightstands flank tight to the frame (~9cm — deliberate, reach from the
+  pillow); BED-01 measures past them to the walls: ~95cm each side.
+  Foot of the bed keeps 130cm to the west wall, so the door→window passage
+  clears BED-02 with room to spare.
+  North window gives soft, even light all day and stays unblocked (95cm
+  approach past the bed). Door at the SW corner opens from the hall; the
+  west wall north of the door swing is reserved for the future wardrobe
+  (dressing zone), facing the bed.
+
+  LIGHTING — per the brief ("no overhead"), the ambient layer is lamp-based:
+  2x 400 lm bedside lamps + 250 lm headboard wash, all 2700 K. This is a
+  deliberate deviation from the ~215 lm/m2 ambient target, accepted for
+  sleep quality. The dressing zone's light is an open slot, selected
+  together with the wardrobe.

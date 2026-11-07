@@ -1,0 +1,360 @@
+# LIVING ROOM
+
+id: living-room
+name: "Living Room with Kitchen"
+area_m2: 25.2  # official
+
+# L-shaped room: the NW corner notch (160x140cm) is the entry hall.
+ascii: |
+  #       N
+  #       ↑
+  #          D───────────────C
+  #   hall   │               │
+  #   E──────┘               │
+  #   │                      │
+  #   F        living        │
+  #   │                      │
+  #   │  dining              │
+  #   │          ┌───────────┤
+  #   A──────────┴───────────B
+  #     (balcony)   kitchen counter along A-B east half
+
+walls:
+  - id: A-B
+    direction: east
+    length: 560
+
+  - id: B-C
+    direction: north
+    length: 490
+
+  - id: C-D
+    direction: west
+    length: 400
+
+  - id: D-E
+    direction: south
+    length: 140
+
+  - id: E-F
+    direction: west
+    length: 160
+
+  - id: F-A
+    direction: south
+    length: 350
+
+validation:
+  trace_closes: true
+  calculated_area: 25.2     # 560x490 - 160x140 notch = 25.20 m²
+  area_difference_pct: 0.0
+  area_matches: true
+
+ceiling_height: 260
+
+design:
+  goal: "Warm Mediterranean living — calm beige/white base with walnut + linen textures, one statement pendant."
+  objectives:
+    - "60-30-10: white walls/tile + beige linen (60%), walnut + terracotta (30%), brass accents (10%)"
+    - "Sofa backs the north wall and faces the south balcony — daylight does the decorating"
+    - "Dining for 4 in the bright SW corner, bridging kitchen and seating without blocking either"
+    - "Layered lighting: dimmable ceiling wash + pendant over dining + floor lamp at sofa + counter spots + plant uplight accent"
+    - "Rug to warm the tile floor and anchor the seating zone"
+    - "Keep paths clear: entry → balcony along the west side, kitchen → dining along the counter aisle"
+
+built_ins:
+  - id: kitchen-cabinets
+    wall: A-B
+    position: 280   # kitchen runs along the eastern half of the south wall
+    length: 280     # to corner B
+    depth: 60
+    zone: kitchen
+    description: |
+      White laminate base + wall cabinets. Countertop runs along the south wall
+      eastern half. Includes sink, 2-burner hob, small fridge.
+
+windows:
+  - id: balcony-door
+    wall: A-B
+    position: 60
+    width: 180
+    type: sliding-door
+    notes: "South-facing balcony access, main natural light source"
+
+  - id: kitchen-window
+    wall: A-B
+    position: 370
+    width: 100
+    type: fixed
+    notes: "Fixed pane above the kitchen counter — reached over the worktop; exempt from WIN-01"
+
+openings:
+  - id: hall-entry
+    wall: D-E
+    position: 30
+    width: 80
+    to: hall
+    has_door: true
+
+outlets:
+  - id: outlet-dining
+    wall: F-A
+    position: 120
+    height: 30
+    type: double
+
+  - id: outlet-sofa
+    wall: C-D
+    position: 60
+    height: 30
+    type: double
+
+  - id: outlet-tv
+    wall: B-C
+    position: 240
+    height: 100
+    type: double
+
+  - id: outlet-kitchen
+    wall: A-B
+    position: 350
+    height: 110
+    type: double
+
+  - id: outlet-balcony
+    wall: A-B
+    position: 25
+    height: 30
+    type: single
+
+heating: []
+plumbing: []
+
+# ----------------------------------------------------------------------------
+# ZONING & CIRCULATION
+# ----------------------------------------------------------------------------
+
+zones:
+  - id: seating
+    purpose: "Lounging, WFH from the sofa, casual TV"
+    anchor: sofa
+    bounds: { x: [250, 560], y: [180, 490] }
+    lighting: [ambient, task]
+
+  - id: dining
+    purpose: "Daily meals for 2, dinners for 4, laptop work in daylight"
+    anchor: dining-table
+    bounds: { x: [10, 160], y: [80, 300] }
+    lighting: [task]
+
+  - id: kitchen
+    purpose: "Cooking along the built-in counter"
+    anchor: kitchen-cabinets
+    bounds: { x: [280, 560], y: [0, 170] }
+    lighting: [task]
+
+focal_point:
+  ref: balcony-door
+  why: "South light and the balcony view — the first thing seen from the entry; the room is composed around it, not around the TV."
+
+# Door-to-door routes the rules engine can measure (openings/doors only — see notes
+# for the kitchen→dining walkway, which the engine cannot take as an endpoint).
+circulation:
+  - id: entry-balcony
+    from: hall-entry
+    to: balcony-door
+    rule: CIRC-01
+
+sightlines:
+  - from: hall-entry
+    toward: focal_point
+    keep_clear: true
+
+lighting:
+  - id: dining-pendant
+    position:
+      wall: [E-F, F-A]
+      offset: [160, 80]   # centered over the dining table
+    ceiling: main
+    mount: pendant
+    layer: task
+    color_temp_k: 2700
+    lumens: 800
+    hang_height_cm: 155   # pendant bottom above floor → 81cm above the 74cm table top
+    fixture: registry/furniture/pendant-lamp.yaml
+    why: "The statement piece of the apartment — a warm brass moment over the dining table, scaled to the zone, not the room."
+
+  - id: kitchen-spots
+    position:
+      wall: [B-C, A-B]
+      offset: [140, 30]
+    ceiling: main
+    mount: recessed
+    layer: task
+    color_temp_k: 2700
+    lumens: 1600
+    fixture: null
+    why: "Shadow-free task light over the worktop; warm temperature keeps the kitchen part of the living room at night."
+
+  - id: living-ambient
+    position:
+      wall: [B-C, A-B]
+      offset: [155, 335]
+    ceiling: main
+    mount: surface
+    layer: ambient
+    color_temp_k: 2700
+    lumens: 2000
+    fixture: null
+    why: "Dimmable warm wash for the seating half (~210 lm/m2 over the 9.6 m2 zone) — the lamps and pendant then do the evening character."
+
+furniture:
+  - id: sofa
+    registry: registry/furniture/sofa.yaml
+    type: sofa
+    zone: seating
+    position:
+      wall: [B-C, C-D]
+      offset: [300, 0]    # back flush to the north wall
+    facing: south
+    why: "Fills 60% of the north wall and faces the balcony — south light on your face, kitchen behind your back, work aisle untouched."
+
+  - id: coffee-table
+    registry: registry/furniture/coffee-table.yaml
+    type: coffee-table
+    zone: seating
+    position:
+      wall: [B-C, A-B]
+      offset: [235, 290]
+    orientation: E-W
+    why: "Within reach of every sofa seat; the low profile keeps the entry-to-balcony sightline open."
+
+  - id: dining-table
+    registry: registry/furniture/dining-table.yaml
+    type: dining-table
+    zone: dining
+    position:
+      wall: [F-A, A-B]
+      offset: [20, 150]
+    orientation: E-W
+    why: "In the bright SW corner between balcony and kitchen — daylight for WFH days, three steps from the hob, under the pendant at night."
+
+  - id: dining-chair-1
+    registry: registry/furniture/dining-chair.yaml
+    type: dining-chair
+    zone: dining
+    position:
+      wall: [F-A, E-F]
+      offset: [30, 62]
+    facing: south
+    why: "North side of the table; the pair leaves the east edge free for the kitchen walkway."
+
+  - id: dining-chair-2
+    registry: registry/furniture/dining-chair.yaml
+    type: dining-chair
+    zone: dining
+    position:
+      wall: [F-A, E-F]
+      offset: [90, 62]
+    facing: south
+    why: "North side of the table, next to chair 1."
+
+  - id: dining-chair-3
+    registry: registry/furniture/dining-chair.yaml
+    type: dining-chair
+    zone: dining
+    position:
+      wall: [F-A, A-B]
+      offset: [82, 92]
+    facing: north
+    why: "South side of the table, facing chair 1 — guests get the balcony light."
+
+  - id: dining-chair-4
+    registry: registry/furniture/dining-chair.yaml
+    type: dining-chair
+    zone: dining
+    position:
+      wall: [F-A, A-B]
+      offset: [142, 92]
+    facing: north
+    why: "South side of the table, facing chair 2."
+
+  - id: floor-lamp
+    registry: registry/furniture/floor-lamp.yaml
+    type: floor-lamp
+    zone: seating
+    position:
+      wall: [B-C, C-D]
+      offset: [55, 45]
+    orientation: E-W
+    layer: task
+    color_temp_k: 2700
+    uses_outlet: outlet-sofa
+    why: "Reading pool at the sofa's east end — the seating zone's second light layer for the no-overhead evenings the brief asks for."
+
+  - id: tv
+    registry: registry/furniture/tv.yaml
+    type: tv
+    zone: seating
+    position:
+      wall: [B-C, A-B]
+      offset: [0, 302]
+    facing: west
+    mount: wall
+    height: 120
+    uses_outlet: outlet-tv
+    why: "The Frame hangs as art on the east wall — the balcony stays the room's focus. No seat is oriented to the screen (TV-01 reports this as a deliberate SKIP); gallery mode by default."
+
+  - id: plant-uplight
+    type: floor-lamp
+    dimensions: { width: 12, depth: 12, height: 25 }
+    position:
+      wall: [F-A, A-B]
+      offset: [28, 10]
+    orientation: E-W
+    layer: accent
+    color_temp_k: 2700
+    lumens: 350
+    uses_outlet: outlet-balcony
+    why: "Accent layer on the focal point — grazes the plants and the balcony reveal at roughly 3x the ambient level after dark."
+
+accessories:
+  - id: living-rug
+    type: area-rug
+    location: "Under the coffee table, reaching the sofa's front legs"
+    notes: "Natural jute or wool, ~200x300cm, warm tone to offset white tile"
+
+  - id: balcony-plants
+    type: plants
+    location: "Flanking the balcony door on the south wall"
+    notes: "2 tall plants in terracotta pots"
+
+notes: |
+  GEOMETRY — L-shaped room: the NW notch (160x140cm) is the entry hall, carved
+  out of the 560x490 rectangle. Wall trace closes and matches the official
+  25.2 m² exactly.
+
+  KITCHEN WINDOW — fixed pane above the worktop, declared `type: fixed`,
+  which exempts it from the WIN-01 approach check (you reach over the
+  counter; the pane doesn't open).
+
+  TV — `SKIP TV-01: no seating oriented toward tv` is deliberate: The Frame
+  is hung as art and the room is composed around the balcony. Anyone who
+  wants primary TV viewing here should re-run /planhaus:furnish with the
+  seating rotated east — and accept losing the balcony orientation.
+
+  LIGHTING MATH — seating zone 9.6 m2: ambient 2000 lm ~ 210 lm/m2 (target
+  ~215); task: floor lamp 470 lm reading pool; dining: pendant 800 lm pool
+  over the 0.96 m2 table; kitchen: 1600 lm spots over the counter; accent:
+  plant uplight 350 lm ~ 3x ambient on the plants. All 2700 K, all dimmable,
+  layers on separate switches.
+
+  KITCHEN→DINING WALKWAY — runs along the counter aisle and past the table's
+  chair-free east edge (~135cm clear, verify with --matrix). Not declared
+  under circulation: because the engine measures declared routes only between
+  openings/doors; furniture endpoints read as blocked.
+
+  ACCEPTED WARNs (documented trade-offs):
+  - PROP-02 (coffee table 46% of sofa width): a compact 110cm table keeps the
+    entry→balcony walkway and sightline open in a small room; a 2/3-width
+    table would pinch circulation.

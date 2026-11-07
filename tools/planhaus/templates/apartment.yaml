@@ -1,0 +1,89 @@
+# APARTMENT
+
+address: ""
+municipality: ""
+floor: 
+total_area_m2: 
+building_year:
+orientation: ""  # which way does main facade face?
+
+location: |
+  # Where is it (development / neighborhood / proximity)?
+
+building: |
+  # Building character + common areas (if relevant to style/material continuity)
+
+character: |
+  # What's special about this place?
+
+challenges: |
+  # Problems to solve
+
+specifications: |
+  # Floors, doors, equipment, electrical, etc.
+  # Freeform - whatever applies to this apartment.
+  # Source documents in docs/
+
+# -----------------------------------------------------------
+# LAYOUT - how rooms relate spatially
+# -----------------------------------------------------------
+
+layout:
+  # ASCII overview of apartment (roughly to scale, ~1 char per 50cm)
+  # Use room IDs or short labels
+  ascii: |
+    N
+    ↑   +--------+------+
+        |bedroom |bath  |
+        +--------+------+
+        | living        |
+        +---------------+
+
+  # How rooms connect
+  adjacencies:
+    - rooms: [living-room, bedroom]
+      shared_wall:
+        living-room: C-D    # wall ID in that room's file
+        bedroom: A-B
+      thickness: 10         # cm
+      notes: ""             # optional alignment notes / openings
+      
+    - rooms: [bedroom, bathroom]
+      shared_wall:
+        bedroom: B-C
+        bathroom: D-A
+      thickness: 10
+      has_door: true
+      notes: ""             # optional
+
+    # Open connections (no wall, or partial wall)
+    - rooms: [hall, living-room]
+      shared_wall:
+        hall: C-D           # mark as open: true in room file
+        living-room: X-Y
+      connection: open      # fully open, no door
+      notes: ""             # optional
+      
+    # Partial opening (wall exists but has opening)
+    # - rooms: [kitchen, dining]
+    #   shared_wall:
+    #     kitchen: B-C
+    #     dining: F-A
+    #   opening:
+    #     width: 120        # cm
+    #     position: 50      # from wall start
+    #   notes: ""           # optional
+
+# -----------------------------------------------------------
+# ROOMS (create from rooms/_template.yaml)
+# -----------------------------------------------------------
+
+rooms:
+  # Example entries - adjust to your apartment:
+  # - id: living-room
+  #   file: rooms/living-room.yaml
+  #   area_m2: 
+  #
+  # - id: bedroom
+  #   file: rooms/bedroom.yaml
+  #   area_m2:

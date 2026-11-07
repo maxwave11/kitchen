@@ -1,0 +1,38 @@
+# Zara Home Brass Pendant
+
+name: "Zara Home Brass Dome Pendant Lamp"
+url: "https://zarahome.com/es/pendant-brass-dome"
+price: 549
+currency: EUR
+
+status: installed
+
+category: pendant
+
+dimensions:
+  width: 40
+  depth: 40
+  height: 30
+
+mass: 3
+lumens: 800
+color_temp_k: 2700
+
+materials: [brass, glass]
+colors: [brushed brass, clear glass]
+finish: "brushed"
+style: [midcentury, modern]
+
+palette_role: accent
+visual_weight: medium
+
+description: |
+  Dome pendant in brushed brass with clear glass diffuser, 40cm
+  diameter. The inside of the dome is polished; warm metallic
+  glow when lit. Fabric-wrapped cord, adjustable drop.
+
+image: ""
+
+notes: |
+  E27 socket; lumens/temp above assume an 800lm 2700K dimmable LED.
+  Requires ceiling hook — check rental rules.

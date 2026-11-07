@@ -1,0 +1,249 @@
+# ROOM NAME
+
+id:
+name: ""
+area_m2:   # official
+
+# ASCII (roughly to scale, ~1 char per 50cm)
+# Label corners A, B, C... matching wall IDs below
+ascii: |
+  #      N
+  #      ↑
+  #        B_________C
+  #        |         |
+  #      A |         | D
+  #        |_________|
+  #        F         E
+
+# WALLS (clockwise from origin, right angles only)
+# Origin = point A, trace computes coordinates
+# Trace MUST close (return to origin) - walls define geometry, not physical walls
+# Check openings: for passages (if width = wall length, entire edge is open)
+walls:
+  - id: A-B
+    direction:   # east / north / west / south
+    length:      # cm
+
+  - id: B-C
+    direction:
+    length:
+
+validation:
+  trace_closes:         # must be true
+  calculated_area:      # from walls (cm² → m²)
+  area_difference_pct:  # vs official
+  area_matches:         # within 5%?
+
+ceiling_height:         # cm, or use object for multiple heights:
+  # main: 260
+  # dropped: 240        # e.g., podhled zones
+
+# DESIGN INTENT (room-level moodboard)
+# This is where the designer translates the client brief into a clear direction for THIS room.
+# Keep it short and actionable; no geometry here.
+design:
+  goal: ""              # 1 sentence (e.g., "Quiet hotel bathroom: warm beige base + crisp chrome.")
+  objectives: []        # 5–10 bullets (rules of the room: palette discipline, hierarchy, lighting intent)
+
+# BUILT-INS (fixed elements - kitchen, wardrobes, cabinets)
+# Describe materials/colors as these define the palette
+# Wall-mounted: use wall + position (from wall start)
+# Freestanding: use position with wall references
+built_ins: []
+  # - id: kitchen-cabinets
+  #   wall: A-B
+  #   position: 0
+  #   depth: 60
+  #
+  # - id: kitchen-island
+  #   position:
+  #     wall: [C-A, A-B]     # reference walls (must be perpendicular)
+  #     offset: [65, 158]    # perpendicular distance from each wall INTO room
+
+# FEATURES (wall ID + position from wall start)
+# - windows: exterior glazing (terrace doors = windows)
+# - openings: interior passages (doorways, archways, open passages)
+#
+# IMPORTANT: wall ID must EXACTLY match a defined wall (e.g., "C-D" not "D-C")
+# Position is measured from the FIRST letter in the wall ID
+windows: []
+openings: []
+  # - id: corridor-entry
+  #   wall: E-D              # must match defined wall exactly
+  #   position: 302          # cm from E (first letter) to START of opening
+  #   width: 120
+  #   to: corridor           # connects to which room
+  #   has_door: false        # true if physical door, false if open passage
+outlets: []
+heating: []
+plumbing: []
+
+# ============================================================================
+# ZONING & CIRCULATION (optional — written by /planhaus-zone, BEFORE furniture)
+# Define zones and circulation routes first; furniture placement happens inside
+# zones, and routes are checked by the rules engine (cited rule IDs).
+# ============================================================================
+
+# ZONES (functional areas of the room)
+zones: []
+  # - id: seating
+  #   purpose: "Conversation + TV viewing"
+  #   anchor: main-sofa                        # item id (may not exist yet at zoning time — name the intended anchor)
+  #   bounds: { x: [0, 300], y: [200, 490] }   # axis-aligned approximation, cm
+  #   lighting: [ambient, accent]              # lighting layers this zone needs
+
+# FOCAL POINT (one per room — what the eye lands on first)
+focal_point:
+  # ref: balcony-door          # feature or item id
+  # why: "Best light + view; first sightline on arrival"
+
+# CIRCULATION (door-to-door routes that must stay clear)
+# rule: which rule the route is checked against —
+#   CIRC-01 = main route between openings, CIRC-02 = secondary path between furniture
+circulation: []
+  # - id: entry-balcony
+  #   from: hall-entry         # opening/window id
+  #   to: balcony-door
+  #   rule: CIRC-01
+
+# SIGHTLINES (views that should stay clear / compose well)
+# Annotation-only: the rules engine independently checks opening -> focal_point
+# (SIGHT-01) regardless of this list. Declared pairs document intent for
+# /planhaus-review and human readers; keep_clear is NOT validated by --check.
+sightlines: []
+  # - from: hall-entry
+  #   toward: focal_point
+  #   keep_clear: true
+
+# LIGHTING (ceiling items use center position)
+# Optional layer fields (used by /planhaus-light and the design checklist):
+#   layer: ambient | task | accent   - which lighting layer this fixture provides
+#   color_temp_k: 2700               - keep consistent across the room (2700-3000 residential)
+#   lumens: 800                      - fixture output
+#   hang_height_cm: 155              - pendants: fixture BOTTOM above the floor (cm);
+#                                      LIGHT-01 derives table clearance by subtracting
+#                                      the table height underneath
+lighting: []
+  # - id: main-pendant
+  #   position:
+  #     wall: [C-A, A-B]     # reference walls [west, south]
+  #     offset: [150, 200]   # distance from each wall to center
+  #   ceiling: main          # or "dropped"
+  #   mount: pendant         # pendant / recessed / surface / track
+  #   layer: ambient         # ambient / task / accent
+  #   color_temp_k: 2700
+  #   lumens: 800
+  #   hang_height_cm: 155    # pendant bottom above floor (over a 74cm table -> 81cm clearance)
+  #   fixture: registry/lighting/example.yaml   # null if TBD
+  #   why: Statement piece over dining table.
+
+# FURNITURE & DECOR (movable items)
+# Position format:
+#   wall: [wall-1, wall-2]  - TWO PERPENDICULAR walls (required)
+#   offset: [x, y]          - perpendicular distance from each wall INTO the room
+#
+# Type (optional, helps the rules engine pick the right clearance rules):
+#   type: <controlled vocab> - one of: sofa, armchair, coffee-table, side-table,
+#         dining-table, dining-chair, desk, desk-chair, bed, nightstand, wardrobe,
+#         dresser, bookshelf, tv, rug, floor-lamp, table-lamp, pendant, plant,
+#         kitchen, island, other
+#         (without type:, the tool falls back to id-keyword sniffing)
+#
+# Zone (optional): zone: <zone-id> - which zone this item belongs to (see zones: above)
+#
+# Orientation (REQUIRED for items with dimensions - use ONE):
+#   facing: north/south/east/west  - directional items (sofa, chair, TV, bed)
+#   orientation: N-S / E-W         - symmetric items (table, island, cabinet)
+#   rotation: degrees              - OPTIONAL, clockwise from base direction (e.g., 10 = 10° off-axis)
+#
+# Wall-mounted items (TV, mirror, painting, shelves):
+#   mount: wall             - Item is wall-mounted
+#   height: N               - cm above floor (AFFL) - REQUIRED for wall-mounted
+#   Effect: skips floor collision checks, skips boundary checks
+#   Position uses offset: [0, Y] where 0 = flush with mount wall
+#
+# On-surface items (lamp, speaker, small decor on furniture):
+#   on: base-object-id      - ID of furniture item this sits on
+#   Effect: skips collision checks (different height layer)
+#   Position: calculate from base object position, define normally
+#
+# How to choose orientation for symmetric items:
+#   1. Which dimension is longer? (usually width)
+#   2. Which axis should the long side run along? (design decision)
+#   3. Set orientation to match: N-S = long side runs N-S, E-W = long side runs E-W
+#   NOTE: Registry comments may describe ONE placement - decide based on room context!
+#
+# Dimensions: width along orientation axis, depth perpendicular
+#   orientation E-W: width→east, depth→north
+#   orientation N-S: width→north, depth→east
+#   facing X: width perpendicular to X, depth toward X
+#   facing convention: for N/S width extends east (+X); for E/W width extends north (+Y)
+#
+# Mass: Loaded from registry (mass: kg), can override inline
+#   Used for: floor load checks, moving logistics, layout decisions
+furniture: []
+  # - id: main-sofa
+  #   registry: registry/sofas/example.yaml
+  #   type: sofa            # controlled vocab (see above)
+  #   zone: seating         # zone id from zones: above
+  #   position:
+  #     wall: [B-F, A-B]    # perpendicular: B-F (east wall), A-B (south wall)
+  #     offset: [80, 300]   # 80cm from east wall, 300cm from south wall
+  #   facing: west          # back against east wall, front faces west
+  #   uses_outlet: outlet-id
+  #   why: Faces window for natural light.
+  #
+  # - id: coffee-table
+  #   type: coffee-table
+  #   zone: seating
+  #   position:
+  #     wall: [B-F, A-B]    # perpendicular walls
+  #     offset: [170, 350]
+  #   orientation: N-S      # long side parallel to sofa (sofa faces west, back runs N-S)
+  #
+  # - id: tv
+  #   registry: registry/electronics/tv.yaml
+  #   type: tv
+  #   zone: seating
+  #   position:
+  #     wall: [A-B, B-C]    # mount on south wall (A-B)
+  #     offset: [0, 200]    # flush with wall (0), centered at 200cm from west
+  #   facing: north         # screen faces into room
+  #   mount: wall           # wall-mounted
+  #   height: 120           # cm AFFL (center of TV)
+  #   screen_diagonal_in: 55  # enables TV-01 viewing-distance check (or set it in the registry item)
+  #
+  # - id: table-lamp
+  #   registry: registry/lighting/lamp.yaml
+  #   type: table-lamp
+  #   position:
+  #     wall: [A-B, B-C]
+  #     offset: [40, 50]    # same area as sideboard below
+  #   orientation: E-W
+  #   on: sideboard         # sits on sideboard - skips collision checks
+
+# ACCESSORIES (non-rendered functional/decorative items)
+# For design thinking - no dimensions, no rendering, no collision checks
+# Examples: trash bin, soap holder, towel rack, toilet brush, tissue box, vase
+accessories: []
+  # - id: guest-bath-bin
+  #   type: trash-bin
+  #   location: "Under sink"
+  #   notes: "Small chrome bin to match fixtures"
+  #
+  # - id: towel-rail
+  #   type: towel-holder
+  #   wall: C-D
+  #   position: 120
+  #   notes: "Chrome rail, 60cm, next to shower"
+
+notes: |
+
+# DO NOT:
+# - Omit orientation/facing for items with dimensions (tool will reject)
+# - Use parallel walls in position (must be perpendicular)
+# - Put interior passages under windows (use openings:)
+# - Use non-standard wall IDs (use letter pattern A-B, B-C)
+# - Invert wall IDs (use C-D not D-C - must match defined walls exactly)
+# - Set trace_closes: false (trace must always close)
+# - Place furniture before zones: and circulation: exist (run /planhaus-zone first)

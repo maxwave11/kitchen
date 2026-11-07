@@ -1,0 +1,38 @@
+# Kave Home Mailen Nightstand
+
+name: "Kave Home Mailen Nightstand"
+url: "https://kavehome.com/es/en/mailen-nightstand"
+price: 169
+currency: EUR
+
+status: installed
+
+category: nightstand
+
+dimensions:
+  width: 50
+  depth: 40
+  height: 55
+
+mass: 8
+
+materials: [ash veneer, solid ash legs]
+colors: [natural ash]
+finish: "matte lacquer"
+style: [scandinavian]
+
+palette_role: secondary
+visual_weight: light
+
+description: |
+  Compact nightstand with one drawer and open shelf below.
+  Ash veneer top, solid ash legs. Light wood tone with a fine,
+  even grain.
+
+  Rounded corners. Drawer has push-to-open mechanism (no handles).
+
+image: ""
+
+notes: |
+  Need 2 (pair for bed). 2 × €169 = €338.
+  Open shelf for books, closed drawer for clutter.

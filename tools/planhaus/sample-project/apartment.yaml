@@ -1,0 +1,95 @@
+# APARTMENT
+
+address: "Calle Ejemplo 12, 3ºB"
+municipality: "Málaga"
+floor: 3
+total_area_m2: 58
+building_year: 2005
+orientation: "south"
+
+location: |
+  Central Málaga, 10 min walk to the beach. Quiet residential street.
+  South-facing balcony from living room.
+
+building: |
+  Modern 4-storey residential block. White exterior, terracotta accents.
+  Shared rooftop terrace. Elevator.
+
+character: |
+  Bright, south-facing apartment with good natural light.
+  Open-plan living/kitchen. Simple finishes but good bones.
+
+challenges: |
+  - Small total area requires careful space planning
+  - White tile floors are cold — need rugs/textiles for warmth
+  - Built-in kitchen is basic — can't change but can style around it
+
+specifications: |
+  Floors: White ceramic tile (60x60cm) throughout
+  Walls: White paint
+  Doors: White hollow-core, standard 80cm
+  Windows: Aluminum frame, double glazed
+  Electrical: Standard Spanish (Schuko), 230V
+  Internet: Fiber optic available
+
+# -----------------------------------------------------------
+# LAYOUT
+# -----------------------------------------------------------
+
+layout:
+  ascii: |
+    N
+    ↑   +-----------+---------+
+        |  bedroom  |  bath*  |
+        +----+------+---------+
+        |hall|                |
+        +----+  living room   |
+        |        + kitchen    |
+        +==========+----------+
+          balcony (south)
+    # * bathroom + entry corridor not modeled in this demo
+
+  adjacencies:
+    - rooms: [living-room, bedroom]
+      shared_wall:
+        living-room: C-D
+        bedroom: A-B
+      thickness: 12
+      notes: "Living room north wall C-D = bedroom south wall A-B along the bedroom's eastern 200cm (bedroom spans the hall + the living room's western part)"
+
+    - rooms: [living-room, hall]
+      shared_wall:
+        living-room: D-E
+        hall: east wall
+      connection: door
+      thickness: 10
+      notes: "The hall is the 160x140cm notch in the living room's NW corner; hall-entry (80cm door on wall D-E) connects them"
+
+    - rooms: [bedroom, hall]
+      shared_wall:
+        bedroom: A-B
+        hall: north wall
+      connection: door
+      thickness: 12
+      notes: "Bedroom door (bedroom-door, SW corner of A-B) opens from the hall"
+
+# -----------------------------------------------------------
+# ROOMS
+# -----------------------------------------------------------
+
+rooms:
+  - id: living-room
+    file: rooms/living-room.yaml
+    area_m2: 25.2
+
+  - id: bedroom
+    file: rooms/bedroom.yaml
+    area_m2: 12.5
+
+  # Minimal connector — referenced by hall-entry (living room) and
+  # bedroom-door. Entry vestibule with the apartment front door; no room
+  # file (nothing to design). Bathroom and remaining circulation make up
+  # the rest of the 58 m² and are not modeled in this demo.
+  - id: hall
+    file: null
+    area_m2: 2.2

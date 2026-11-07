@@ -1,0 +1,47 @@
+# Item Name
+
+name: ""
+url: ""
+price:
+currency: ""    # ISO code next to numeric price, e.g., EUR / CZK / USD
+
+status: considering  # considering | shortlisted | rejected | purchased | installed
+rejected_reason: ""  # only for status: rejected — why it didn't fit (keep for record)
+
+# Controlled vocab (matches catalog categories):
+# sofa, armchair, dining_table, dining_chair, coffee_table, side_table, bed,
+# nightstand, wardrobe, dresser, bookshelf, rug, floor_lamp, table_lamp,
+# pendant, mirror, decor, outdoor, other
+category: ""
+
+dimensions:
+  width:
+  depth:
+  height:
+
+mass:           # kg — used for floor load checks, moving logistics
+seat_height:    # cm — seating only (sofa/armchair/chair)
+lumens:         # lighting only — fixture output
+color_temp_k:   # lighting only — e.g., 2700
+
+materials: []   # e.g., [solid oak, linen, black metal]
+colors: []      # e.g., [charcoal, cream]
+finish: ""      # e.g., matte, glossy, brushed
+style: []       # tags, controlled vocab: scandinavian, midcentury, modern, industrial,
+                # rustic, traditional, coastal, japandi, mediterranean, bohemian, eclectic
+
+palette_role: ""     # dominant | secondary | accent — role in the room's 60-30-10 palette
+visual_weight: ""    # light | medium | heavy — how much visual mass the piece carries
+
+# OBJECTIVE description of the item itself.
+# Describe: form, proportions, visual weight, texture, materials, craftsmanship.
+# NO recommendations, placement suggestions, or "how to use" - those go in room YAML.
+# SKIP: certifications, load capacity, assembly, delivery.
+description: |
+
+# Download product image and save locally.
+image: ""  # local path, e.g., furniture/example.jpg
+
+notes: |
+  # Factual notes only (brand, series, variants, stock status).
+  # NO design recommendations or placement suggestions.

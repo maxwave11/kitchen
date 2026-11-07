@@ -1,0 +1,38 @@
+# Zara Home Ceramic Table Lamp
+
+name: "Zara Home Ceramic Table Lamp"
+url: "https://zarahome.com/es/ceramic-table-lamp"
+price: 59
+currency: EUR
+
+status: installed
+
+category: table_lamp
+
+dimensions:
+  width: 22
+  depth: 22
+  height: 38
+
+mass: 2
+lumens: 400
+color_temp_k: 2700
+
+materials: [ceramic base, linen shade]
+colors: [terracotta, natural linen]
+finish: "matte glaze"
+style: [mediterranean]
+
+palette_role: accent
+visual_weight: light
+
+description: |
+  Small ceramic table lamp with textured terracotta base and
+  natural linen drum shade. Handmade feel with subtle
+  imperfections. Warm ambient glow through linen.
+
+image: ""
+
+notes: |
+  Need 2 (pair for nightstands). 2 × €59 = €118.
+  E14 socket; lumens/temp above assume a 400lm 2700K bulb.
