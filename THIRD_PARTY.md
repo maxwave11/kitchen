@@ -12,3 +12,13 @@
 enrich-catalog, setup, migrate, агент furniture-curator, хуки плагина.
 
 Свой код: `.claude/skills/kitchen-living-planner/`, `tools/room3d/`.
+
+## 3D-модели техники (`assets/models/`)
+
+CAD-модели производителей, скачанные Максимом в формате .3ds и сконвертированные `tools/room3d/tds_to_glb.py`
+(геометрия без изменений, цвета материалов заданы вручную). Используются только для визуализации планировки.
+
+| Файл | Изделие |
+|---|---|
+| `hansgrohe-c51-f450-01.glb` | Hansgrohe C51-F450-01 sink combi 450 select, арт. 43212000 |
+| `aeg-fridge-freezer-bottom-silver.glb` | AEG, холодильник с нижней морозилкой, серебристый |

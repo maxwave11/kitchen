@@ -44,20 +44,20 @@ design:
 
 built_ins: []
 windows:
-  # Wall confirmed by Maxim (opposite the doorway). Position/size are PLACEHOLDERS (centered, typical size).
+  # Wall confirmed by Maxim (opposite the doorway). Position/size still unmeasured.
   - id: window
     wall: D-A
-    position: 78        # TODO: cm from corner D to window edge (placeholder = centered)
+    position: 78        # TODO: measure (cm from corner D to window edge)
     width: 150          # TODO
     sill_height: 85     # TODO
     height: 150         # TODO
     type: casement
 openings:
-  # Wall confirmed by Maxim. Position/size are PLACEHOLDERS (centered, standard door).
+  # Wall confirmed by Maxim; position/width set in the 3D viewer (2026-11-07).
   - id: door-1
     wall: B-C
-    position: 113       # TODO: cm from corner B to opening edge (placeholder = centered)
-    width: 80           # TODO
+    position: 0         # cm from corner B to opening edge
+    width: 80
     height: 210         # TODO
     to: ""              # TODO: where it leads
     has_door: true      # TODO
@@ -66,6 +66,155 @@ openings:
 outlets: []
 heating: []
 plumbing: []     # TODO: water supply / drain riser, ventilation, gas
+
+# Kitchen palette (3D viewer): fronts of every `kitchen: true` cabinet, their carcass and all worktops.
+kitchen_colors:
+  facade: "#d49b16"
+  carcass: "#654a29"
+  worktop: "#6b6259"
+
+# 3D-only objects for the viewer (tools/room3d). Every object STANDS AGAINST A WALL and stays flush with it:
+#   wall      wall id; the object's back is on that wall's inner surface (plus `gap`)
+#   position  cm from the wall's first corner (B for B-C) to the object's near edge, along the wall
+#   width     cm along the wall (the front side)        depth  cm from the wall into the room
+#   height    cm                                         elevation  cm above the floor (default 0)
+#   gap       cm between wall and back of the object (default 0; < 0 = sunk into the wall, down to -20)
+#   top       optional countertop thickness, cm (slab on top, 2 cm front overhang)
+#   kitchen   true = cabinet in the kitchen palette (front panel + carcass + worktop); panel = plain carcass board
+#   facade_side  start | end = front panel on the side facing the wall's first / second corner
+#   model     .glb fitted into the object's box;  cutout: {in, width, depth} = hole in another object
+#   type: portal  П-shaped arch of `rails` frames (rail_width along the depth, rail_thickness profile)
+# Saved from the 3D viewer (Maxim, 2026-11-07). Sink: Hansgrohe C51-F450-01, fridge: AEG bottom freezer,
+# both from Maxim's .3ds files (assets/models/). Sink cut-out is an estimate from the model - take the
+# real one from the Hansgrohe installation template.
+objects:
+  - id: e-base
+    label: "Нижние шкафы (B-C)"
+    group: "Стена B-C"
+    wall: B-C
+    position: 144
+    width: 162
+    depth: 60
+    height: 90
+    top: 4
+    color: "#d8cfc4"
+    kitchen: true
+  - id: sink
+    label: "Мойка Hansgrohe C51-F450-01"
+    group: "Стена B-C"
+    wall: B-C
+    position: 173.1
+    gap: 5
+    elevation: 65.5
+    width: 56
+    depth: 52
+    height: 62.5
+    color: "#303030"
+    model: assets/models/hansgrohe-c51-f450-01.glb
+    cutout: {in: e-base, width: 53, depth: 49}
+  - id: e-upper
+    label: "Верхний шкаф (B-C)"
+    group: "Стена B-C"
+    wall: B-C
+    position: 144
+    elevation: 160
+    width: 162
+    depth: 40
+    height: 99.5
+    color: "#e9e6df"
+    kitchen: true
+  - id: fridge-panel
+    label: "Панель ДСП между порталом и холодильником"
+    group: "Стена B-C"
+    wall: B-C
+    position: 80
+    width: 1.6
+    depth: 64
+    height: 210
+    color: "#d8cfc4"
+    kitchen: panel
+  - id: fridge
+    label: "Холодильник AEG"
+    group: "Стена B-C"
+    wall: B-C
+    position: 82
+    elevation: 2
+    width: 59.5
+    depth: 67.2
+    height: 184.5
+    color: "#c9ccce"
+    model: assets/models/aeg-fridge-freezer-bottom-silver.glb
+  - id: fridge-top
+    label: "Шкаф над холодильником"
+    group: "Стена B-C"
+    wall: B-C
+    position: 81
+    elevation: 190
+    width: 62
+    depth: 64
+    height: 70
+    color: "#e9e6df"
+    kitchen: true
+  - id: portal-shelf
+    label: "Полка над порталом"
+    group: "Портал"
+    wall: B-C
+    position: 0
+    elevation: 210
+    width: 81
+    depth: 64
+    height: 50
+    color: "#b08b5e"
+    kitchen: true
+  - id: portal
+    label: "Портал (арка из реек)"
+    group: "Портал"
+    type: portal
+    wall: B-C
+    position: 0
+    gap: -12
+    width: 80
+    depth: 76
+    height: 210
+    rails: 8
+    rail_width: 5
+    rail_thickness: 1
+    color: "#b08b5e"
+  - id: n-base
+    label: "Нижние шкафы (C-D)"
+    group: "Стена C-D"
+    wall: C-D
+    position: 60
+    width: 180
+    depth: 60
+    height: 90
+    top: 4
+    color: "#d8cfc4"
+    kitchen: true
+  - id: hob
+    label: "Варочная панель"
+    group: "Стена C-D"
+    wall: C-D
+    position: 110
+    gap: 4.1
+    elevation: 94
+    width: 60
+    depth: 52
+    height: 1
+    color: "#1d1d1d"
+  - id: bar
+    label: "Стойка (полуостров)"
+    group: "Стойка"
+    wall: C-D
+    position: 176
+    gap: 60
+    width: 64
+    depth: 143.5
+    height: 90
+    top: 4
+    color: "#d8cfc4"
+    kitchen: true
+    facade_side: start
 
 zones: []
 focal_point:
@@ -78,4 +227,15 @@ accessories: []
 notes: |
   2026-11-07: overall size from Maxim: 5.362 m x 3.061 m, ceiling 2.7 m.
   2026-11-07: doorway on wall B-C, window on opposite wall D-A (Maxim). Positions/sizes still placeholders.
-  TODO: exact window/door positions and sizes, second doorway, utilities, official area.
+  2026-11-07: sink Hansgrohe C51-F450-01 in the B-C base run (centre 201 cm from B, 3D model + worktop cut-out);
+    fridge box replaced by the AEG bottom-freezer model (59.5 x 67.2 x 184.5). Both from Maxim's .3ds files.
+  2026-11-07: portal = one object (type: portal): П-shaped arch of 6 rail frames 2 x 4 cm over 40 cm depth,
+    corner B .. far edge of door-1; replaces the old 'portal-rails' box. Rail count/sizes editable in the viewer.
+  2026-11-07: kitchen palette kitchen_colors (facade / carcass / worktop) for all `kitchen: true` cabinets,
+    editable in the viewer; each cabinet gets a front panel on its room side; bar: on the kitchen side (facade_side: start).
+  2026-11-07: upper cabinets + mezzanine on B-C merged into one wall cabinet e-upper (140-260, 35 deep).
+  2026-11-07: 16 mm chipboard divider fridge-panel (94.1-95.7, 67.2 deep, 190 high) between portal and fridge;
+    fridge moved 0.75 cm towards the sink (position 96.1).
+  2026-11-07: layout saved from the 3D viewer (Maxim): door-1 at 0..80 on B-C, kitchen palette, all objects
+    (base run 144..306 h 90, upper cabinet 160..259.5 d 40, fridge niche 80..143, portal 8 rails 5 x 1 cm, d 76 from -12).
+  TODO: exact window/door positions and sizes, second doorway, utilities (water/drain riser for the sink), official area.

@@ -19,10 +19,29 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                color ("#rrggbb"), countertop: true|false (default true for kitchen),
                upper: {depth: 35, height: 72, elevation: 145}   # wall cabinets above
   furniture[]: color, elevation (cm above floor; overrides mount/on logic)
+  objects[]:   boxes that stand against a wall and stay flush with it; edited in the viewer
+               (not checked by the rules engine): id, label, group, wall, position (cm from the wall's
+               first corner), width (along the wall), depth (from the wall), height, elevation (default 0),
+               gap (wall to back of the object, default 0), top (countertop thickness, optional), color,
+               model (optional .glb, path from the repo root or the YAML's folder; embedded into the HTML;
+                      its bounding box is fitted into the object's box, its front (+Z) faces the room;
+                      a manufacturer's .3ds converts with tools/room3d/tds_to_glb.py),
+               cutout: {in: <object id>, width, depth}   # hole of that size, centred under this object,
+                      through the other object's body and worktop (a sink in a base cabinet)
+               kitchen: true -> a kitchen cabinet: body in kitchen_colors.carcass, a front panel in
+                      kitchen_colors.facade (the side facing the room), worktop (`top`) in kitchen_colors.worktop;
+               kitchen: panel -> a plain board (end panel, divider) wholly in kitchen_colors.carcass, no front;
+               facade_side: start | end  -> the front panel on the side facing the wall's first / second corner
+                      instead (a peninsula with its doors towards the kitchen run)
+  kitchen_colors: {facade, carcass, worktop}   # one palette for the whole kitchen, edited in the viewer
+               type: portal  -> a П-shaped arch of `rails` identical frames spread evenly over `depth`
+                      (from the wall into the room); rail_width = size of one frame along the depth,
+                      rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
 
 Coordinates: origin = corner A, X = east, Y = north, cm (planhaus convention).
 """
 import argparse
+import base64
 import json
 import subprocess
 import sys
@@ -155,7 +174,43 @@ def main():
         if f["on"] and f["on"] in tops and y_furniture.get(f["id"], {}).get("elevation") is None:
             f["elevation"] = tops[f["on"]]
 
+    wall_ids = {w["id"] for w in walls}
+    objects, models = [], {}
+
+    def embed_model(oid, ref):
+        if ref in models:
+            return ref
+        for p in (Path(ref), room_path.parent / ref):
+            if p.is_file():
+                models[ref] = "data:model/gltf-binary;base64," + base64.b64encode(p.read_bytes()).decode()
+                return ref
+        sys.stderr.write(f"objects[{oid}]: model {ref!r} not found, drawing a box\n")
+        return None
+
+    for o in room.get("objects") or []:
+        if not (isinstance(o, dict) and o.get("id")):
+            continue
+        if o.get("wall") not in wall_ids:
+            sys.stderr.write(f"objects[{o['id']}]: wall {o.get('wall')!r} is not a wall of this room, skipped\n")
+            continue
+        objects.append({
+            "id": o["id"], "label": o.get("label") or o["id"], "group": o.get("group") or "Объекты", "wall": o["wall"],
+            "position": num(o.get("position"), 0), "width": num(o.get("width"), 50), "depth": num(o.get("depth"), 50),
+            "height": num(o.get("height"), 50), "elevation": num(o.get("elevation"), 0), "gap": num(o.get("gap"), 0),
+            "top": num(o.get("top"), 0) if o.get("top") is not None else None,
+            "color": o.get("color") or COLORS["other"],
+            "model": embed_model(o["id"], o["model"]) if o.get("model") else None,
+            "cutout": o.get("cutout") if isinstance(o.get("cutout"), dict) else None,
+            "kitchen": "panel" if o.get("kitchen") == "panel" else bool(o.get("kitchen")),
+            "facade_side": o.get("facade_side") if o.get("facade_side") in ("start", "end") else None,
+        })
+        if o.get("type") == "portal":
+            objects[-1].update({"type": "portal", "rails": int(num(o.get("rails"), 6)),
+                                "rail_width": num(o.get("rail_width"), 2), "rail_thickness": num(o.get("rail_thickness"), 4)})
+
     data = {
+        "objects": objects, "models": models,
+        "kitchen": {k: str(v) for k, v in (room.get("kitchen_colors") or {}).items() if k in ("facade", "carcass", "worktop")},
         "name": room.get("name") or room.get("id") or room_path.stem,
         "area_m2": (room.get("validation") or {}).get("calculated_area") or room.get("area_m2"),
         "ceiling": ceiling, "thickness": thickness, "walls": walls, "holes": holes,

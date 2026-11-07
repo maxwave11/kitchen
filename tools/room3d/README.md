@@ -17,3 +17,17 @@ python3 tools/room3d/build_room_3d.py rooms/kitchen-living.yaml -o viewer/kitche
 
 Проверено на демо-комнате planhaus:
 `python3 tools/room3d/build_room_3d.py tools/planhaus/sample-project/rooms/living-room.yaml -o viewer/sample-living-room.html`
+
+## 3D-модели вместо коробок
+
+У объекта в `objects:` можно указать `model: assets/models/<name>.glb` — сборщик встроит GLB прямо в HTML,
+а вьюер впишет модель в коробку объекта (ширина вдоль стены, глубина от стены, высота; перед модели (+Z в glTF)
+смотрит в комнату). `cutout: {in: <id>, width, depth}` вырезает отверстие в корпусе и столешнице другого
+объекта (мойка в нижнем шкафу). Модель производителя в .3ds конвертируется так:
+
+```bash
+python3 tools/room3d/tds_to_glb.py model.3ds -o assets/models/name.glb --scale 0.001 --mat ma3=#c9ccce:0.7:0.32
+```
+
+`--scale` — перевод единиц файла в метры (мм → 0.001), `--mat имя=#цвет:metalness:roughness` — материалы
+(в .3ds нет PBR-данных); скрипт печатает размеры модели в см — их и ставить в `width/height/depth`.
