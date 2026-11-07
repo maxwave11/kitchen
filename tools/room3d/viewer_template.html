@@ -30,6 +30,7 @@
   .kcol input[type=color] { width:100%; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; }
   .kcol input.mod { border-color:var(--mod); }
   details.help { margin-top:10px; font-size:11px; color:var(--muted); } details.help summary { cursor:pointer; }
+  #tree .aptsep { margin:10px 6px 4px; padding-top:8px; border-top:1px solid var(--line); }
 
   /* right panel: outliner */
   #treewrap { min-height:0; display:flex; flex-direction:column; }
@@ -75,6 +76,26 @@
   #ydlg::backdrop { background:rgba(0,0,0,.4); }
   #yaml { display:block; width:100%; box-sizing:border-box; height:min(420px, 65vh); padding:8px; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:6px; font:12px/1.4 ui-monospace,Consolas,monospace; }
   #ydlg button { margin-top:8px; }
+
+  /* phone: the scene gets the whole screen; "Вид" / "Объекты" in a bottom bar open one panel at a time as a bottom sheet */
+  #mbar { display:none; }
+  @media (max-width: 700px) {
+    #mbar { display:flex; gap:6px; position:fixed; left:50%; transform:translateX(-50%); bottom:calc(10px + env(safe-area-inset-bottom));
+            padding:5px; background:var(--panel); border-radius:12px; box-shadow:0 2px 14px rgba(0,0,0,.25); }
+    #mbar button { font-size:15px; padding:9px 18px; }
+    #panel, #side { display:none; left:8px; right:8px; width:auto; top:auto; bottom:calc(66px + env(safe-area-inset-bottom));
+             max-height:min(62vh, calc(100vh - 150px)); }
+    body.sheet-panel #panel { display:block; }
+    body.sheet-side #side { display:flex; }
+    #treewrap { flex:none; } #tree { max-height:24vh; }      /* tree keeps its height, the editor below scrolls */
+    #insp { flex:1; min-height:0; }
+    #tree summary, #tree .item { padding-top:8px; padding-bottom:8px; }
+    .eye { padding:4px 8px; }
+    button { padding:7px 10px; }
+    .seg button { padding:7px 6px; }
+    details.help { display:none; }
+    .lbl { font-size:10px; }
+  }
 </style>
 <script type="importmap">
 { "imports": {
@@ -94,7 +115,7 @@
   <div class="sec"><span class="lab">Камера</span>
     <div class="seg"><button id="bpersp">Перспектива</button><button id="bortho">Ортогональная</button></div></div>
   <div class="sec"><span class="lab">Показать</span>
-    <div class="chips"><button id="bwalls">Срез стен</button><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button></div></div>
+    <div class="chips"><button id="bwalls">Срез стен</button><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Остальные комнаты квартиры: стены, полы, мебель">Квартира</button></div></div>
   <div class="sec"><span class="lab">Цвета кухни</span><div class="kcol" id="kcolors"></div></div>
   <details class="help"><summary>Управление мышью</summary>
     Вращение: левая кнопка / один палец. Сдвиг: правая кнопка / два пальца. Масштаб: колесо / щипок.
@@ -117,6 +138,7 @@
     <div class="frow"><button id="byaml">Просмотреть YAML</button></div>
   </div>
 </div>
+<div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Объекты</button></div>
 <dialog id="ydlg">
   <textarea id="yaml" readonly></textarea>
   <form method="dialog"><button>Закрыть</button></form>
@@ -135,6 +157,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const R = __ROOM_DATA__;
 R.objects ||= [];
 R.models ||= {};
+R.apartment ||= [];                                // other rooms of the flat (apartment.yaml), context around this one
+const aptItems = R.apartment.flatMap(r => r.items);
+const shellId = r => 'room:' + r.id;               // "walls and floor" of an apartment room, one tree row
+const aptIds = R.apartment.flatMap(r => [shellId(r), ...r.items.map(i => i.id)]);
 // one palette for every kitchen cabinet (objects with kitchen: true): fronts, carcass (sides, top, bottom), worktops
 R.kitchen = { facade: '#e9e6df', carcass: '#d8cfc4', worktop: '#6b6259', ...(R.kitchen || {}) };
 const KCOL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
@@ -182,7 +208,14 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 let sel = ui.sel ?? null;                          // selected item id (opening or object)
 const hid = new Set(ui.hidden || []);              // hidden object ids
-const collapsed = new Set(ui.collapsed || []);     // collapsed tree groups
+// apartment rooms start hidden (only this room is being designed): a room this browser has not seen yet is hidden,
+// a new item follows its room (added to apartment.yaml later, it shows up wherever its room is shown)
+const seenApt = new Set(ui.seen || []);
+R.apartment.forEach(r => {
+  if (!seenApt.has(shellId(r))) hid.add(shellId(r));
+  r.items.forEach(i => { if (!seenApt.has(i.id) && hid.has(shellId(r))) hid.add(i.id); });
+});
+const collapsed = new Set(ui.collapsed || R.apartment.map(r => r.name));     // collapsed tree groups
 let cutaway = ui.cutaway ?? true;
 let saveTimer;
 function saveUi() {                                // debounced: camera 'change' fires on every frame
@@ -191,7 +224,7 @@ function saveUi() {                                // debounced: camera 'change'
     try {
       localStorage.setItem(UKEY, JSON.stringify({
         view, isOrtho, sel, cutaway, ao, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
-        hidden: [...hid], collapsed: [...collapsed],
+        hidden: [...hid], collapsed: [...collapsed], seen: aptIds,
         cam: { p: camera.position.toArray(), t: controls.target.toArray(), z: camera.zoom },
       }));
     } catch { /* not persisted */ }
@@ -203,9 +236,11 @@ function saveUi() {                                // debounced: camera 'change'
 // An edit is dropped if the YAML value it was made against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill'],
-  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness'] };   // rails*: type portal
-const kindOf = it => it.kind ? 'hole' : 'object';
-const all = () => [...R.holes, ...R.objects];
+  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness'],   // rails*: type portal
+  box: ['x', 'y', 'sx', 'sy', 'height', 'elevation'] };                                                                  // apartment items
+const kindOf = it => it.kind ? 'hole' : it.room ? 'box' : 'object';
+const all = () => [...R.holes, ...R.objects, ...aptItems];
+const roomById = id => R.apartment.find(r => r.id === id);
 const byId = id => all().find(i => i.id === id);
 const wallById = id => R.walls.find(w => w.id === id);
 const pick = it => Object.fromEntries(KEYS[kindOf(it)].map(k => [k, it[k]]));
@@ -233,6 +268,9 @@ const saveEdits = () => {
 // change of any size can never detach an item from its wall. Limits are shared with the sliders (rangeOf).
 const perpOf = w => Math.abs(w.dx) > .5 ? maxY - minY : maxX - minX;          // room size across that wall (rectangular room)
 const rangeOf = (it, k) => {
+  if (it.room) return ({                           // apartment item: anywhere inside the flat's outline
+    x: [aMinX, aMaxX - it.sx], y: [aMinY, aMaxY - it.sy], sx: [1, aMaxX - aMinX], sy: [1, aMaxY - aMinY],
+    height: [1, H - it.elevation], elevation: [0, H - it.height] })[k];
   const w = wallById(it.wall), L = w.L, perp = perpOf(w);
   return ({
     position: [0, L - it.width], width: [it.kind ? 10 : 1, L], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
@@ -284,6 +322,10 @@ const ccw = signed > 0;
 const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
 const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
 const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, span = Math.max(maxX - minX, maxY - minY);
+// outline of the whole flat (this room + apartment.yaml rooms): limits for moving apartment items, framing
+const aPts = [...pts, ...R.apartment.flatMap(r => [...r.floor, ...r.walls.flatMap(b => [[b[0], b[1]], [b[2], b[3]]])])];
+const aMinX = Math.min(...aPts.map(p => p[0])), aMaxX = Math.max(...aPts.map(p => p[0]));
+const aMinY = Math.min(...aPts.map(p => p[1])), aMaxY = Math.max(...aPts.map(p => p[1]));
 
 // 1.4 m x 1.4 m tile of grey-brown laminate boards (20 x 70 cm, staggered); ShapeGeometry UVs are in metres, so repeat = 1/1.4
 function plankTexture() {
@@ -304,19 +346,20 @@ function plankTexture() {
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 1.4, 1 / 1.4); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
+const plank = plankTexture();                      // shared with the laminate floors of the other rooms
 const floorShape = new THREE.Shape(pts.map(p => new THREE.Vector2(p[0] * S, p[1] * S)));
 const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape),
-  new THREE.MeshStandardMaterial({ map: plankTexture(), roughness: .5 }));
+  new THREE.MeshStandardMaterial({ map: plank, roughness: .5 }));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
 scene.add(floor);
 
 const T = R.thickness, H = R.ceiling;
 const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xf3f0ea, roughness: .95 });
-const wallGroups = [], pickables = [];
+const wallGroups = [], pickables = [], aptWalls = [];
 const root = new THREE.Group(); scene.add(root);   // walls, openings, objects: rebuilt on every edit
 function clearRoot() {
   root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); o.material?.dispose(); } });   // model meshes are reused
-  root.clear(); wallGroups.length = 0; pickables.length = 0;
+  root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0;
 }
 
 function boxBetween(u0, u1, z0, z1, w, mat) {
@@ -465,6 +508,51 @@ function build() {
       const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
       l.position.set(0, (o.height + (o.top || 0)) * S / 2 + .08, 0); body.add(l);
     }
+  });
+  R.apartment.forEach(buildAptRoom);
+}
+
+// ---------- the rest of the flat (apartment.yaml): floors, wall boxes, glass, furniture boxes ----------
+// Plan boxes are [x0, y0, x1, y1] (+ [z0, z1]) in this room's frame. Walls do not cast shadows, so showing
+// the flat never darkens the room being designed; they take part in the cutaway (updateWalls).
+const planBox = (b, z0, z1, mat) => {
+  const [x0, x1] = [Math.min(b[0], b[2]), Math.max(b[0], b[2])], [y0, y1] = [Math.min(b[1], b[3]), Math.max(b[1], b[3])];
+  const m = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * S, (z1 - z0) * S, (y1 - y0) * S), mat);
+  m.position.copy(P((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2));
+  m.userData.c = [(x0 + x1) / 2, (y0 + y1) / 2];
+  return m;
+};
+function buildAptRoom(r) {
+  if (!hid.has(shellId(r))) {
+    const fl = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))),
+      new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
+    fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
+    const wm = wallMat();
+    r.walls.forEach(b => {
+      const m = planBox(b, b.length > 4 ? b[4] : 0, b.length > 4 ? b[5] : H, wm);
+      m.receiveShadow = true; root.add(m); aptWalls.push(m);
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
+    });
+    const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
+    r.glass.forEach(b => { const m = planBox(b, b[4], b[5], gm); root.add(m); aptWalls.push(m); });
+    const xs = r.floor.map(p => p[0]), ys = r.floor.map(p => p[1]);
+    addLabel(`${r.name}${r.area_m2 ? ' · ' + r.area_m2 + ' м²' : ''}`,
+      P((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, 3), '', root);
+  }
+  r.items.forEach(i => {
+    if (hid.has(i.id)) return;
+    const picked = i.id === sel;
+    const m = planBox([i.x, i.y, i.x + i.sx, i.y + i.sy], i.elevation, i.elevation + i.height,
+      new THREE.MeshStandardMaterial({ color: i.color, roughness: .6 }));
+    m.castShadow = m.receiveShadow = true; m.userData.id = i.id;
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial(
+      picked ? { color: 0xff7a00, depthTest: false } : { color: 0x000000, transparent: true, opacity: .3 }));
+    if (picked) {
+      edges.renderOrder = 10;
+      const l = makeLabel(`${i.label} · ${r1(i.sx)}×${r1(i.sy)}×${r1(i.height)}`, 'hole');
+      l.position.set(0, i.height * S / 2 + .08, 0); m.add(l);
+    }
+    m.add(edges); root.add(m); pickables.push(m);
   });
 }
 
@@ -619,7 +707,7 @@ function addLabel(text, pos, cls, parent = scene) { const l = makeLabel(text, cl
 
 // ---------- ambient occlusion (GTAO) ----------
 // shortcut: full-resolution GTAO is heavy on weak GPUs / phones; the "Затенение (AO)" toggle bypasses the composer.
-let ao = ui.ao ?? true;
+let ao = ui.ao ?? !matchMedia('(max-width: 700px)').matches;   // AO is heavy for phones: off there unless turned on
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
@@ -648,14 +736,19 @@ function useCamera(c) {
 // views: 'iso' (3D), 'top' (plan, north up), 'wall:<id>' (elevation: looking at that wall from inside), '' (moved by hand)
 function setView(v = view) {
   view = v;
-  let d = [-.55, -.95, .9], t = [cx, cy, 0];                       // offset from target, in room spans
+  // 3D and top view frame the whole flat while any of its rooms is shown, otherwise just this room
+  const flat = !v.startsWith('wall:') && R.apartment.some(r => !hid.has(shellId(r)));
+  const fs = flat ? Math.max(aMaxX - aMinX, aMaxY - aMinY) : span;
+  let d = [-.55, -.95, .9], t = flat ? [(aMinX + aMaxX) / 2, (aMinY + aMaxY) / 2, 0] : [cx, cy, 0];   // offset from target, in spans
   if (v === 'top') d = [0, -.001, 1.5];
   else if (v.startsWith('wall:')) {
     const w = R.walls.find(w => 'wall:' + w.id === v);
     d = [-w.nx * 1.2, -w.ny * 1.2, 0]; t = [cx, cy, H / 2];
   }
-  camera.zoom = 1;
-  camera.position.copy(P(t[0] + d[0] * span, t[1] + d[1] * span, t[2] + d[2] * span));
+  camera.zoom = isOrtho ? span / fs : 1;                            // the ortho frustum is sized for this room
+  // portrait screen (phone): step back so the width fits (the diagonal 3D view needs more room than the plan)
+  const k = isOrtho ? fs : fs * Math.max(1, (v === 'iso' ? 1.3 : .9) / persp.aspect);
+  camera.position.copy(P(t[0] + d[0] * k, t[1] + d[1] * k, t[2] + d[2] * k));
   controls.target.copy(P(...t));
   camera.updateProjectionMatrix(); quietly(() => controls.update());
   markView(); saveUi();
@@ -683,6 +776,13 @@ function updateWalls() {
     g.visible = !(cutaway && w.nx * camDir.x - w.ny * camDir.z > .2);
     labels.forEach(l => { l.visible = g.visible; });
   });
+  // apartment walls: cut away those standing between the camera and a room-sized box around the orbit target
+  // (looking at the kitchen hides the rooms in front of it; pan to the corridor and it opens up the same way)
+  const dx = camDir.x, dy = -camDir.z, len = Math.hypot(dx, dy);
+  const cut = cutaway && len > .2, ux = dx / len, uy = dy / len;
+  const tx = controls.target.x / S, ty = -controls.target.z / S;
+  const reach = Math.abs(ux) * (maxX - minX) / 2 + Math.abs(uy) * (maxY - minY) / 2;
+  aptWalls.forEach(m => { m.visible = !(cut && (m.userData.c[0] - tx) * ux + (m.userData.c[1] - ty) * uy > reach); });
 }
 
 R.walls.forEach(w => {
@@ -696,6 +796,13 @@ btn('bwalls').onclick = e => { cutaway = !cutaway; e.target.classList.toggle('on
 btn('blabels').onclick = e => { const on = document.body.classList.toggle('hide-labels'); e.target.classList.toggle('on', !on); saveUi(); };
 btn('bao').onclick = e => { ao = !ao; e.target.classList.toggle('on', ao); saveUi(); };
 btn('bzones').onclick = e => { zoneGroup.visible = !zoneGroup.visible; e.target.classList.toggle('on', zoneGroup.visible); saveUi(); };
+// the whole flat at once: hides everything if anything of it is shown, otherwise shows all of it and frames it
+btn('bapt').hidden = !R.apartment.length;
+btn('bapt').onclick = () => {
+  const show = aptIds.every(id => hid.has(id));
+  setHidden(aptIds, !show);
+  if (view === 'top' || view === 'iso') setView(view);
+};
 
 // ---------- outliner + inspector (right panel) ----------
 const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -724,13 +831,32 @@ function eye(off, fn) {
   return b;
 }
 function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); saveUi(); }
-function select(id) { sel = id; build(); renderTree(); renderEditor(); saveUi(); }
+function select(id) {
+  sel = id; build(); renderTree(); renderEditor(); saveUi();
+  if (phone.matches) sheet('side', !!id);          // phone: a tap on an object opens its editor, a tap on empty space closes the sheet
+}
+
+// ---------- phone layout: one bottom sheet at a time (CSS @media max-width 700px) ----------
+const phone = matchMedia('(max-width: 700px)');
+function sheet(name, open) {                       // open: true / false, or undefined = toggle
+  const cur = ['panel', 'side'].find(n => document.body.classList.contains('sheet-' + n));
+  const next = open === undefined ? (cur === name ? null : name) : open ? name : null;
+  document.body.classList.remove('sheet-panel', 'sheet-side');
+  if (next) document.body.classList.add('sheet-' + next);
+  document.querySelectorAll('#mbar button').forEach(b => b.classList.toggle('on', b.dataset.sheet === next));
+}
+document.querySelectorAll('#mbar button').forEach(b => b.onclick = () => sheet(b.dataset.sheet));
 
 function renderTree() {
   const tree = btn('tree'); tree.replaceChildren();
   const groups = new Map([['Проёмы', R.holes]]);
   R.objects.forEach(o => { if (!groups.has(o.group)) groups.set(o.group, []); groups.get(o.group).push(o); });
+  // other rooms: one group each, "walls and floor" first (not selectable: nothing to edit), then the furniture
+  R.apartment.forEach(r => groups.set(r.name,
+    [{ id: shellId(r), label: 'Стены и пол', shell: true, color: r.floor_color || '#8b7560' }, ...r.items]));
+  btn('bapt').classList.toggle('on', !aptIds.every(id => hid.has(id)));
   groups.forEach((list, name) => {
+    if (R.apartment.length && name === R.apartment[0].name) tree.append(el('h2', 'aptsep', 'Квартира'));
     const hideable = list !== R.holes, ids = list.map(o => o.id);
     const d = el('details'); d.open = !collapsed.has(name);
     d.ontoggle = () => { d.open ? collapsed.delete(name) : collapsed.add(name); saveUi(); };
@@ -745,7 +871,7 @@ function renderTree() {
       const sw = el('i', 'sw'); sw.style.background = swatch(it);
       r.append(sw, el('span', 'nm', it.label));
       if (hideable) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
-      r.onclick = () => select(it.id);
+      r.onclick = it.shell ? () => setHidden([it.id], !hid.has(it.id)) : () => select(it.id);
       d.append(r);
     });
     tree.append(d);
@@ -753,7 +879,10 @@ function renderTree() {
 }
 
 // width = the front side (along the wall the object stands against), depth = away from that wall
-const sections = it => it.kind ? [
+const sections = it => it.room ? [
+  ['Положение (от угла A кухни)', [['x', 'X — вдоль стены A-B'], ['y', 'Y — вдоль стены B-C'], ['elevation', 'Высота от пола']]],
+  ['Размер', [['sx', 'По X (вдоль A-B)'], ['sy', 'По Y (вдоль B-C)'], ['height', 'Высота']]],
+] : it.kind ? [
   ['Положение', [['position', `От угла ${it.wall.split('-')[0]}`]]],
   ['Размер', [['width', 'Ширина'], ['height', 'Высота'], ...(it.kind === 'window' ? [['sill', 'Подоконник от пола']] : [])]],
 ] : [
@@ -768,7 +897,7 @@ function renderEditor() {
   if (!it) return;
   btn('esw').style.background = swatch(it);
   btn('etitle').textContent = it.label;
-  btn('esub').textContent = it.wall ? `Стена ${it.wall}` : it.group;
+  btn('esub').textContent = it.wall ? `Стена ${it.wall}` : it.room ? roomById(it.room).name : it.group;
   inputs = {}; btn('fields').replaceChildren();
   sections(it).forEach(([title, rows]) => {
     btn('fields').append(el('div', 'stitle', title));
@@ -798,8 +927,12 @@ function refresh() {
       num.classList.toggle('mod', it[k] !== o[k]);
     });
     btn('eundo').hidden = !Object.keys(inputs).some(k => it[k] !== o[k]);
-    const L = wallById(it.wall).L;
-    btn('ehint').textContent = `Стена ${it.wall}: ${r1(L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(L - it.position - it.width)} см.`;
+    if (it.room) btn('ehint').textContent = `Координаты кухни: X ${r1(it.x)}…${r1(it.x + it.sx)}, Y ${r1(it.y)}…${r1(it.y + it.sy)} см.\n`
+      + 'Размеры по плану застройщика (±10–15 см) — уточните рулеткой.';
+    else {
+      const L = wallById(it.wall).L;
+      btn('ehint').textContent = `Стена ${it.wall}: ${r1(L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(L - it.position - it.width)} см.`;
+    }
   }
   btn('yaml').value = yamlText();
 }
@@ -817,7 +950,11 @@ function yamlText() {
   return `# окна и проёмы: обновить поля в windows: / openings: файла rooms/*.yaml (sill → sill_height)\n${R.holes.map(hole).join('\n')}`
     + `\n\n# цвета кухни: заменить блок kitchen_colors: целиком\nkitchen_colors:\n`
     + KCOL.map(([k]) => `  ${k}: "${R.kitchen[k]}"`).join('\n')
-    + `\n\n# объекты: заменить блок objects: целиком\nobjects:\n${R.objects.map(obj).join('\n')}`;
+    + `\n\n# объекты: заменить блок objects: целиком\nobjects:\n${R.objects.map(obj).join('\n')}`
+    + R.apartment.filter(r => r.items.length).map(r => `\n\n# apartment.yaml, комната ${r.id}: заменить items: целиком\n    items:\n`
+      + r.items.map(i => `      - id: ${i.id}\n        label: ${JSON.stringify(i.label)}\n`
+        + KEYS.box.filter(k => k !== 'elevation' || i[k]).map(k => `        ${k}: ${r1(i[k])}`).join('\n')
+        + `\n        color: "${i.color}"`).join('\n')).join('');
 }
 
 function resetItems(items) {

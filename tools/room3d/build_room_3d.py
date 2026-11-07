@@ -39,6 +39,11 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
 
 Coordinates: origin = corner A, X = east, Y = north, cm (planhaus convention).
+
+The rest of the apartment comes from apartment.yaml (next to rooms/, or --apartment) when its
+`frame:` is this room's id: per room a floor polygon, wall boxes, glass panes and furniture boxes,
+all in this room's coordinates (format in apartment.yaml). The viewer lists each room in its tree,
+hidden until the user shows it.
 """
 import argparse
 import base64
@@ -82,11 +87,43 @@ def by_id(items):
     return {i.get("id"): i for i in (items or []) if isinstance(i, dict)}
 
 
+def load_apartment(path, room_id, required):
+    """Other rooms of the apartment, in this room's coordinates, as context for the viewer."""
+    if not path.is_file():
+        if required:
+            sys.exit(f"{path}: not found")
+        return []
+    apt = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if apt.get("frame") != room_id:
+        if required:
+            sys.exit(f"{path}: frame is {apt.get('frame')!r}, not {room_id!r}")
+        return []
+    boxes = lambda rows, n: [[float(v) for v in r] for r in rows or [] if isinstance(r, list) and len(r) in n]
+    rooms = []
+    for r in apt.get("rooms") or []:
+        if not (isinstance(r, dict) and r.get("id")):
+            continue
+        rooms.append({
+            "id": r["id"], "name": r.get("name") or r["id"], "area_m2": r.get("area_m2"),
+            "floor": [[float(x), float(y)] for x, y in r.get("floor") or []],
+            "floor_color": r.get("floor_color"),             # none = the kitchen's laminate
+            "walls": boxes(r.get("walls"), (4, 6)), "glass": boxes(r.get("glass"), (6,)),
+            "items": [{
+                "id": i["id"], "label": i.get("label") or i["id"], "room": r["id"],
+                "x": num(i.get("x"), 0), "y": num(i.get("y"), 0), "sx": num(i.get("sx"), 50), "sy": num(i.get("sy"), 50),
+                "height": num(i.get("height"), 50), "elevation": num(i.get("elevation"), 0),
+                "color": i.get("color") or COLORS["other"],
+            } for i in r.get("items") or [] if isinstance(i, dict) and i.get("id")],
+        })
+    return rooms
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("room", help="room YAML (planhaus format)")
     ap.add_argument("-o", "--out", help="output HTML (default: viewer/<room-id>.html)")
     ap.add_argument("--title", help="page title")
+    ap.add_argument("--apartment", help="apartment YAML with the other rooms (default: apartment.yaml next to rooms/)")
     args = ap.parse_args()
 
     room_path = Path(args.room)
@@ -210,6 +247,8 @@ def main():
 
     data = {
         "objects": objects, "models": models,
+        "apartment": load_apartment(Path(args.apartment) if args.apartment else room_path.parent.parent / "apartment.yaml",
+                                    room.get("id") or room_path.stem, bool(args.apartment)),
         "kitchen": {k: str(v) for k, v in (room.get("kitchen_colors") or {}).items() if k in ("facade", "carcass", "worktop")},
         "name": room.get("name") or room.get("id") or room_path.stem,
         "area_m2": (room.get("validation") or {}).get("calculated_area") or room.get("area_m2"),
@@ -225,7 +264,8 @@ def main():
     html = html.replace("__TITLE__", args.title or f"3D: {data['name']}")
     html = html.replace("__ROOM_DATA__", json.dumps(data, ensure_ascii=False))
     out.write_text(html, encoding="utf-8")
-    print(f"wrote {out}  ({len(walls)} walls, {len(holes)} openings, {len(built)} built-ins, {len(furn)} items)")
+    print(f"wrote {out}  ({len(walls)} walls, {len(holes)} openings, {len(built)} built-ins, {len(furn)} items, "
+          f"{len(objects)} objects, {len(data['apartment'])} other rooms)")
 
 
 if __name__ == "__main__":

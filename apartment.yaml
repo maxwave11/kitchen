@@ -1,0 +1,266 @@
+# APARTMENT (Maxim) - 2-room flat, 56.48 m² total / 55.29 m² without the loggia
+# Source: developer's plan docs/apartment-plan.png (areas on the plan are official).
+
+total_area_m2: 56.48
+living_area_m2: 23.20      # both bedrooms
+
+# -----------------------------------------------------------
+# LAYOUT
+# -----------------------------------------------------------
+# The kitchen-living room is the only room modelled in detail (rooms/kitchen-living.yaml).
+# Every other room is CONTEXT for its 3D viewer: walls, floors and the big furniture, drawn
+# around the kitchen and hidden by default (the eye icons in the viewer's tree show them).
+#
+# All coordinates below are in the KITCHEN's frame: origin = kitchen corner A, X = "east"
+# (along kitchen wall A-B), Y = "north" (along B-C), cm. On the plan image that is:
+# X = up, Y = left. The plan is not exactly to scale: it was fitted so the kitchen matches
+# Maxim's measurements (536.2 x 306.1 cm), the rest is read off the plan, about ±10-15 cm.
+# Plan areas vs the fitted outlines: corridor 9.66 / 9.91, bedroom 13.15 / 12.42,
+# bedroom 10.05 / 10.70, bathroom 4.01 / 4.66 (with the riser box), WC 1.45 / 1.29.
+#
+#   X ↑ (east)
+#        +-----------------------------+
+#        |  loggia 3.98                |
+#        +----------------+------------+
+#        |  bedroom 13.15              |
+#        |                             |
+#        +------+---door--+-----+------+
+#        | WC   |  corridor 9.66 |hall unit
+#        +------+                entrance door →
+#        |vent  |wardrobe+------------+--------+
+#        +------+--door--+  corridor  | bathroom
+#        |                | branch     | 4.01
+#        |  KITCHEN-LIVING +--door-----+--------+
+#        |  16.97          |  bedroom 10.05      |
+#        |  (C-D left,     |                     |
+#        |   A-B right)    |                     |
+#        +-----------------+---------------------+   ← Y (north) to the left
+#        D   window      A      window
+#
+#  adjacencies (kitchen wall ids):
+#    kitchen B-C (door-1)  -> corridor
+#    kitchen A-B           -> corridor branch (X 350..536) and bedroom 10.05 (X 0..337)
+
+# -----------------------------------------------------------
+# 3D CONTEXT for tools/room3d/build_room_3d.py (frame: kitchen-living)
+#   floor:  polygon [[x, y], ...]; floor_color: "#rrggbb" (tiles), none = laminate like the kitchen
+#   walls:  [x0, y0, x1, y1]          full-height wall box (any two opposite corners)
+#           [x0, y0, x1, y1, z0, z1]  partial box: lintel over a door, wall under a window
+#   glass:  [x0, y0, x1, y1, z0, z1]  window / balcony door pane
+#   items:  boxes, edited in the viewer like the kitchen objects:
+#           x, y = corner with the smallest X and Y; sx = size along X, sy = size along Y;
+#           height, elevation (cm above the floor, default 0), color
+# -----------------------------------------------------------
+frame: kitchen-living
+height: 270
+rooms:
+  - id: corridor
+    name: "Коридор"
+    area_m2: 9.66
+    floor: [[350, -12], [350, -134.5], [623, -134.5], [623, -37], [809, -37], [809, 181.5],
+            [548.2, 181.5], [548.2, -12]]
+    walls:
+      - [741.5, -37, 809, -60.5]              # east wall, next to the entrance door
+      - [623, -37, 649, -60.5]                # stub between bathroom and entrance door
+      - [649, -37, 741.5, -60.5, 210, 270]    # lintel over the entrance door
+      - [548.2, 296, 801, 334]                # outer wall behind the ventilation and the WC
+    items:
+      - id: wardrobe
+        label: "Шкаф (вдоль стены туалета)"
+        x: 548.2
+        y: 121.5
+        sx: 180
+        sy: 60
+        height: 240
+        color: "#3b2e28"
+      - id: hall-unit
+        label: "Прихожая (вешалка, зеркало, тумба)"
+        x: 774
+        y: -35
+        sx: 35
+        sy: 95
+        height: 200
+        color: "#4a3a30"
+      - id: entrance-door
+        label: "Входная дверь"
+        x: 651
+        y: -60
+        sx: 88.5
+        sy: 6
+        height: 205
+        color: "#3a2a22"
+
+  - id: wc
+    name: "Туалет"
+    area_m2: 1.45
+    floor_color: "#c9c6c0"
+    floor: [[675, 194], [801, 194], [801, 296], [675, 296]]
+    walls:
+      - [548.2, 181.5, 740, 194]              # one solid wall from the kitchen to the WC door (740..801)
+      - [740, 181.5, 801, 194, 210, 270]      # lintel over the WC door
+      - [665, 194, 675, 296]                  # wall between the toilet and the ventilation box
+      - [801, 182.5, 809, 306]                # wall to bedroom 13.15
+    items:
+      - id: vent-box
+        label: "Вентиляция (закрытый объём за стеной)"
+        x: 548.2
+        y: 194
+        sx: 116.8
+        sy: 102
+        height: 270
+        color: "#ece8e1"
+      - id: wc-door
+        label: "Дверь туалета"
+        x: 742
+        y: 186
+        sx: 57
+        sy: 4
+        height: 200
+        color: "#4a3a30"
+      - id: toilet-tank
+        label: "Бачок / инсталляция"
+        x: 675
+        y: 225
+        sx: 18
+        sy: 44
+        height: 80
+        color: "#f4f4f2"
+      - id: toilet
+        label: "Унитаз"
+        x: 693
+        y: 229
+        sx: 50
+        sy: 36
+        height: 40
+        color: "#f4f4f2"
+
+  - id: bedroom-13
+    name: "Спальня 13,15"
+    area_m2: 13.15
+    floor: [[827, -27], [1200, -27], [1200, 306], [827, 306]]
+    walls:
+      - [809, -26, 827, 83]                   # wall to the corridor (door 83..172.5)
+      - [809, 172.5, 827, 306]
+      - [809, 83, 827, 172.5, 210, 270]       # lintel over the bedroom door
+      - [808, -27, 1200, -52.5]               # wall to the stairwell
+      - [801, 306, 1200, 334]                 # outer wall
+      - [1200, 204, 1236, 334]                # wall to the loggia
+      - [1200, -11, 1236, 24.5]
+      - [1200, 107, 1236, 204, 0, 85]         # under the window
+      - [1200, 24.5, 1236, 204, 220, 270]     # over the balcony door and window
+    glass:
+      - [1215, 107, 1221, 204, 85, 220]       # window
+      - [1215, 24.5, 1221, 107, 0, 220]       # balcony door
+    items:
+      - id: bedroom-13-door
+        label: "Дверь спальни (открыта)"
+        x: 827
+        y: 168.5
+        sx: 80
+        sy: 4
+        height: 200
+        color: "#4a3a30"
+
+  - id: loggia
+    name: "Лоджия"
+    area_m2: 3.98
+    floor_color: "#a7a39c"
+    floor: [[1236, -11], [1338, -11], [1338, 334], [1236, 334]]
+    walls:
+      - [1200, -52.5, 1321.5, -11]            # side wall
+      - [1338, -11, 1348, 345, 0, 100]        # parapet
+      - [1236, 334, 1348, 345, 0, 100]
+    glass:
+      - [1340, -11, 1346, 345, 100, 250]
+      - [1236, 337, 1340, 343, 100, 250]
+
+  - id: bathroom
+    name: "Ванная"
+    area_m2: 4.01
+    floor_color: "#c9c6c0"
+    floor: [[358.5, -149], [623, -149], [623, -325], [358.5, -325]]
+    walls:
+      - [337, -134.5, 472, -149]              # wall to the corridor (door 472..539.5)
+      - [539.5, -134.5, 623, -149]
+      - [472, -134.5, 539.5, -149, 210, 270]  # lintel over the bathroom door
+      - [623, -61.5, 644.5, -360]             # wall to the stairwell
+      - [337, -325, 644.5, -360]              # wall to the neighbours
+      - [337, -147, 358.5, -325]              # wall to bedroom 10.05
+      - [566, -215, 621.5, -227.5]            # washing-machine niche
+      - [566, -227.5, 577, -325]
+      - [523, -289, 566, -325]                # riser box
+    items:
+      - id: bathroom-door
+        label: "Дверь ванной"
+        x: 474
+        y: -143.5
+        sx: 63.5
+        sy: 4
+        height: 200
+        color: "#4a3a30"
+      - id: bath
+        label: "Ванна"
+        x: 361
+        y: -321
+        sx: 158
+        sy: 75
+        height: 58
+        color: "#f4f4f2"
+      - id: washbasin
+        label: "Раковина"
+        x: 361
+        y: -222
+        sx: 45
+        sy: 55
+        height: 20
+        elevation: 65
+        color: "#f4f4f2"
+      - id: washer
+        label: "Стиральная машина"
+        x: 578
+        y: -300
+        sx: 43
+        sy: 60
+        height: 85
+        color: "#e8e8e8"
+
+  - id: bedroom-10
+    name: "Спальня 10,05"
+    area_m2: 10.05
+    floor: [[0, -12], [337, -12], [337, -329.5], [0, -329.5]]
+    walls:
+      - [337, -12, 350, -30.5]                # wall to the corridor (door -30.5..-115.5)
+      - [338, -115.5, 350, -134.5]
+      - [338, -30.5, 350, -115.5, 210, 270]   # lintel over the bedroom door
+      - [-40, -329.5, 337, -360]              # wall to the neighbours
+      - [-40, -12, 0, -61.5]                  # outer wall (window -61.5..-241)
+      - [-40, -241, 0, -329.5]
+      - [-40, -61.5, 0, -241, 0, 85]          # under the window
+      - [-40, -61.5, 0, -241, 235, 270]       # over the window
+    glass:
+      - [-23, -61.5, -17, -241, 85, 235]
+    items:
+      - id: bedroom-10-door
+        label: "Дверь спальни (открыта)"
+        x: 258
+        y: -115.5
+        sx: 80
+        sy: 4
+        height: 200
+        color: "#4a3a30"
+
+notes: |
+  2026-11-07: all rooms traced from the developer's plan (docs/apartment-plan.png) into the kitchen's frame
+    for the 3D viewer. The plan's kitchen door is 51..136 cm from corner B; the real one (rooms/kitchen-living.yaml,
+    door-1) is 0..80 - the kitchen is drawn from the YAML, the corridor from the plan.
+  2026-11-07: from Maxim's photos: a tall deep wardrobe on the left of the corridor seen from the kitchen door
+    (the plan's niche between the WC and the kitchen), a hall unit (hooks, mirror, shoe bench) on the far wall,
+    the metal entrance door on the right wall. Sizes are estimates.
+  2026-11-07: the crossed box in the hall's corner is the hall unit (Maxim). The ventilation box is at the far left of
+    the plan: the double partition between the toilet and the wardrobe niche (box 24.5 cm + 10 cm wall). Door leaves
+    added: WC and bathroom closed, bedrooms open into the rooms; the WC got a cistern/installation box.
+  2026-11-07: no niche between the WC and the kitchen (Maxim): one solid wall from the kitchen to the WC door, behind it
+    a closed ventilation volume (vent-box, X 548..665). The wardrobe from the photo stands in the corridor along that
+    wall, from the kitchen wall towards the WC door (180 x 60 x 240, estimate) - matches photo 2.
+  TODO: measure the wardrobe (width x depth x height, where it starts from the kitchen wall), the hall unit,
+    the ventilation box, the entrance door and the corridor width - the plan is only ±10-15 cm.

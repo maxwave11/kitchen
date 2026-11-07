@@ -2,7 +2,7 @@
 
 id: kitchen-living
 name: "Кухня-гостиная"
-area_m2:   # official area unknown yet
+area_m2: 16.97   # developer plan (docs/apartment-plan.png)
 
 # Rectangle 536.2 x 306.1 cm. Compass orientation is NOT known yet:
 # "south" here just means wall A-B (the long wall with corner A at its left end
@@ -32,8 +32,8 @@ walls:
 validation:
   trace_closes: true
   calculated_area: 16.41    # 536.2 x 306.1
-  area_difference_pct:      # no official area yet
-  area_matches:
+  area_difference_pct: -3.3
+  area_matches: true
 
 ceiling_height: 270
 wall_thickness: 12
@@ -238,4 +238,7 @@ notes: |
     fridge moved 0.75 cm towards the sink (position 96.1).
   2026-11-07: layout saved from the 3D viewer (Maxim): door-1 at 0..80 on B-C, kitchen palette, all objects
     (base run 144..306 h 90, upper cabinet 160..259.5 d 40, fridge niche 80..143, portal 8 rails 5 x 1 cm, d 76 from -12).
-  TODO: exact window/door positions and sizes, second doorway, utilities (water/drain riser for the sink), official area.
+  2026-11-07: rest of the flat added as 3D context (apartment.yaml, from docs/apartment-plan.png). On that plan the
+    kitchen is 16.97 m2, its door 51..136 cm from B (real door-1: 0..80) and the window 43..221 cm from D, 178 wide
+    (here: 78 from D, 150 wide) - re-measure the window.
+  TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).

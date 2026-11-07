@@ -12,6 +12,8 @@
 - После каждого изменения комнаты: `python3 tools/planhaus/scripts/room_spatial.py rooms/<room>.yaml --check`
   (в планхаусе это делал хук; здесь — вручную).
 - 3D: `python3 tools/room3d/build_room_3d.py rooms/<room>.yaml -o viewer/<room>.html`.
+- Остальная квартира (коридор, спальни, ванная, туалет, лоджия) — контекст для 3D в `apartment.yaml`,
+  в координатах кухни, снята с плана застройщика `docs/apartment-plan.png` (точность ±10–15 см).
 
 ## Установленные скиллы (`.claude/skills/`)
 
