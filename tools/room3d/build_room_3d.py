@@ -37,6 +37,8 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                type: portal  -> a П-shaped arch of `rails` identical frames spread evenly over `depth`
                       (from the wall into the room); rail_width = size of one frame along the depth,
                       rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
+               type: table   -> a slab (`top` thick, default 4) on four square legs (`leg` section, default 5),
+                      5 cm in from the edges; height = to the top surface; kitchen: true = slab in the worktop colour
 
 Coordinates: origin = corner A, X = east, Y = north, cm (planhaus convention).
 
@@ -244,6 +246,8 @@ def main():
         if o.get("type") == "portal":
             objects[-1].update({"type": "portal", "rails": int(num(o.get("rails"), 6)),
                                 "rail_width": num(o.get("rail_width"), 2), "rail_thickness": num(o.get("rail_thickness"), 4)})
+        elif o.get("type") == "table":
+            objects[-1].update({"type": "table", "top": num(o.get("top"), 4), "leg": num(o.get("leg"), 5)})
 
     data = {
         "objects": objects, "models": models,

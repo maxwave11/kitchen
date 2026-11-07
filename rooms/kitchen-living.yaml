@@ -202,19 +202,46 @@ objects:
     depth: 52
     height: 1
     color: "#1d1d1d"
+  # Bar table instead of the peninsula cabinet (Maxim, 2026-11-08): no carcass, four legs, movable.
+  # Top flush with the worktop (94) and pushed against the C-D worktop front (60 + 2 cm overhang).
   - id: bar
-    label: "Стойка (полуостров)"
-    group: "Стойка"
+    label: "Барный стол"
+    group: "Барный стол"
+    type: table
     wall: C-D
     position: 176
-    gap: 60
-    width: 64
-    depth: 143.5
-    height: 90
+    gap: 62
+    width: 90
+    depth: 150
+    height: 94
     top: 4
-    color: "#d8cfc4"
+    leg: 5
+    color: "#1e1e1e"
     kitchen: true
-    facade_side: start
+  # COR Jalis 522 counter stools (seat ~65 cm), from Maxim's Jalis.zip; standing on the living-room side,
+  # facing the table (east), seat front 10 cm under the table edge.
+  - id: stool-1
+    label: "Полубарный стул COR Jalis 522 (1)"
+    group: "Барный стол"
+    wall: D-A
+    position: 77
+    gap: 231
+    width: 45.2
+    depth: 49
+    height: 89.9
+    color: "#6e655c"
+    model: assets/models/cor-jalis-522-counter-stool.glb
+  - id: stool-2
+    label: "Полубарный стул COR Jalis 522 (2)"
+    group: "Барный стол"
+    wall: D-A
+    position: 152
+    gap: 231
+    width: 45.2
+    depth: 49
+    height: 89.9
+    color: "#6e655c"
+    model: assets/models/cor-jalis-522-counter-stool.glb
 
 zones: []
 focal_point:
@@ -241,4 +268,9 @@ notes: |
   2026-11-07: rest of the flat added as 3D context (apartment.yaml, from docs/apartment-plan.png). On that plan the
     kitchen is 16.97 m2, its door 51..136 cm from B (real door-1: 0..80) and the window 43..221 cm from D, 178 wide
     (here: 78 from D, 150 wide) - re-measure the window.
+  2026-11-08: peninsula cabinet 'bar' (64 x 143.5) replaced by a movable bar table on legs, 90 x 150, top at 94
+    (flush with the worktop, worktop colour), against the C-D worktop front; grows west, so the kitchen aisle
+    to the B-C run stays 116 cm; 94 cm left to wall A-B (route from door-1 to the living part).
+    2 COR Jalis 522 counter stools (seat ~65) on the living side. No stool at the south end: seated there,
+    the route along A-B would shrink to ~55 cm. No stools on the kitchen side (work aisle).
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).

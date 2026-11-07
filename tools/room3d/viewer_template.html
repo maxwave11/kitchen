@@ -64,6 +64,7 @@
   .ibox input.mod { border-color:var(--mod); }
   .unit { position:absolute; right:7px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--muted); pointer-events:none; }
   #ehint { white-space:pre-line; margin-top:8px; }
+  label.chk { display:flex; align-items:center; gap:8px; margin:8px 0; cursor:pointer; } label.chk input { accent-color:var(--accent); margin:0; }
   #foot { display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:10px; }
   .frow { display:flex; gap:6px; } .frow button { flex:1; }
   button:disabled { opacity:.4; cursor:default; } button:disabled:hover { background:transparent; }
@@ -76,6 +77,8 @@
   #ydlg::backdrop { background:rgba(0,0,0,.4); }
   #yaml { display:block; width:100%; box-sizing:border-box; height:min(420px, 65vh); padding:8px; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:6px; font:12px/1.4 ui-monospace,Consolas,monospace; }
   #ydlg button { margin-top:8px; }
+  #speed { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); padding:5px 12px; border-radius:8px; background:var(--panel); box-shadow:0 2px 10px rgba(0,0,0,.2); font-size:12px; pointer-events:none; opacity:0; transition:opacity .3s; }
+  #speed.show { opacity:1; }
 
   /* phone: the scene gets the whole screen; "Вид" / "Объекты" in a bottom bar open one panel at a time as a bottom sheet */
   #mbar { display:none; }
@@ -115,11 +118,12 @@
   <div class="sec"><span class="lab">Камера</span>
     <div class="seg"><button id="bpersp">Перспектива</button><button id="bortho">Ортогональная</button></div></div>
   <div class="sec"><span class="lab">Показать</span>
-    <div class="chips"><button id="bwalls">Срез стен</button><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Остальные комнаты квартиры: стены, полы, мебель">Квартира</button></div></div>
+    <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Остальные комнаты квартиры: стены, полы, мебель">Квартира</button></div></div>
   <div class="sec"><span class="lab">Цвета кухни</span><div class="kcol" id="kcolors"></div></div>
   <details class="help"><summary>Управление мышью</summary>
     Вращение: левая кнопка / один палец. Сдвиг: правая кнопка / два пальца. Масштаб: колесо / щипок.
-    Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.</details>
+    Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
+    Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</details>
 </div>
 <div id="side" class="panel">
   <div id="treewrap"><h2>Объекты</h2><div id="tree"></div></div>
@@ -138,6 +142,7 @@
     <div class="frow"><button id="byaml">Просмотреть YAML</button></div>
   </div>
 </div>
+<div id="speed"></div>
 <div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Объекты</button></div>
 <dialog id="ydlg">
   <textarea id="yaml" readonly></textarea>
@@ -216,14 +221,26 @@ R.apartment.forEach(r => {
   r.items.forEach(i => { if (!seenApt.has(i.id) && hid.has(shellId(r))) hid.add(i.id); });
 });
 const collapsed = new Set(ui.collapsed || R.apartment.map(r => r.name));     // collapsed tree groups
-let cutaway = ui.cutaway ?? true;
+// ---------- walls as tree rows: every wall (this room's and each apartment wall/glass box) has its own cutaway setting ----------
+// cutaway on (default): the wall disappears while the camera looks at it from outside; off ("solid"): always visible, from both sides
+const aptWallRows = r => [
+  ...r.walls.map((b, k) => {
+    const z0 = b.length > 4 ? b[4] : 0, z1 = b.length > 4 ? b[5] : R.ceiling;
+    const kind = z0 > 0 ? 'Перемычка' : z1 < R.ceiling ? 'Низкая стенка' : 'Стена';
+    return { id: `${r.id}:w${k}`, label: `${kind} ${k + 1} · ${Math.round(Math.abs(b[2] - b[0]))}×${Math.round(Math.abs(b[3] - b[1]))}`, wallOf: r, color: '#f3f0ea' };
+  }),
+  ...r.glass.map((b, k) => ({ id: `${r.id}:g${k}`, label: `Стекло ${k + 1} · ${Math.round(Math.max(Math.abs(b[2] - b[0]), Math.abs(b[3] - b[1])))}`, wallOf: r, color: '#9fd0ef' })),
+];
+const WALLS = [...R.walls.map(w => ({ id: 'w:' + w.id, label: 'Стена ' + w.id, w, color: '#f3f0ea' })), ...R.apartment.flatMap(aptWallRows)];
+const wallRow = id => WALLS.find(x => x.id === id);
+const solid = new Set(ui.solid || (ui.cutaway === false ? WALLS.map(x => x.id) : []));   // ids of walls without cutaway (old global switch carried over)
 let saveTimer;
 function saveUi() {                                // debounced: camera 'change' fires on every frame
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
       localStorage.setItem(UKEY, JSON.stringify({
-        view, isOrtho, sel, cutaway, ao, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
+        view, isOrtho, sel, solid: [...solid], ao, speed, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
         hidden: [...hid], collapsed: [...collapsed], seen: aptIds,
         cam: { p: camera.position.toArray(), t: controls.target.toArray(), z: camera.zoom },
       }));
@@ -236,7 +253,7 @@ function saveUi() {                                // debounced: camera 'change'
 // An edit is dropped if the YAML value it was made against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill'],
-  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness'],   // rails*: type portal
+  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'],   // rails*: type portal, leg: type table
   box: ['x', 'y', 'sx', 'sy', 'height', 'elevation'] };                                                                  // apartment items
 const kindOf = it => it.kind ? 'hole' : it.room ? 'box' : 'object';
 const all = () => [...R.holes, ...R.objects, ...aptItems];
@@ -276,12 +293,13 @@ const rangeOf = (it, k) => {
     position: [0, L - it.width], width: [it.kind ? 10 : 1, L], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
     sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap], gap: [-20, perp - it.depth], top: [0, 10],   // gap < 0: sunk into the wall (a niche)
     rails: [1, 40], rail_width: [.5, it.depth / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
+    leg: [1, Math.min(it.width, it.depth) / 2],
   })[k];
 };
 // ---------- undo / redo of document changes (item sizes and positions, hidden objects; not the camera) ----------
 const undo = [], redo = [];
 let lastEdit = { key: '', t: 0 };
-const snap = () => JSON.stringify({ v: Object.fromEntries(all().map(i => [i.id, pick(i)])), h: [...hid], k: R.kitchen });
+const snap = () => JSON.stringify({ v: Object.fromEntries(all().map(i => [i.id, pick(i)])), h: [...hid], k: R.kitchen, s: [...solid] });
 const syncHist = () => { btn('bundo').disabled = !undo.length; btn('bredo').disabled = !redo.length; };
 function record(key = '') {                         // call BEFORE changing the data
   const now = Date.now();
@@ -292,9 +310,10 @@ function record(key = '') {                         // call BEFORE changing the 
 function step(from, to) {
   if (!from.length) return;
   to.push(snap());
-  const { v, h, k } = JSON.parse(from.pop());
+  const { v, h, k, s } = JSON.parse(from.pop());
   all().forEach(i => Object.assign(i, v[i.id]));
   hid.clear(); h.forEach(id => hid.add(id));
+  if (s) { solid.clear(); s.forEach(id => solid.add(id)); }
   if (k) Object.assign(R.kitchen, k);
   lastEdit = { key: '', t: 0 }; syncHist(); syncKitchen();
   saveEdits(); build(); renderTree(); renderEditor(); refresh(); saveUi();
@@ -390,9 +409,9 @@ function build() {
     const turn = (a, b) => (a.dx * b.dy - a.dy * b.dx) * (ccw ? 1 : -1);  // >0 convex
     const L = w.L;
     const ext0 = turn(prev, w) > 0 ? T : 0, ext1 = turn(w, next) > 0 ? T : 0;
-    const mat = wallMat();
+    const mat = wallMat(), wid = 'w:' + w.id;
     // grp = the wall with its openings; `labels` are hidden together with it (a CSS2D label ignores its parent's visibility)
-    const grp = new THREE.Group(); grp.userData = { w, labels: [] };
+    const grp = new THREE.Group(); grp.userData = { w, wid, labels: [] };
     const wallLabel = (text, pos, cls) => grp.userData.labels.push(addLabel(text, pos, cls, grp));
     const holes = R.holes.filter(h => h.wall === w.id).map(h => ({ ...h, u0: h.position, u1: h.position + h.width }))
                          .sort((a, b) => a.u0 - b.u0);
@@ -403,7 +422,12 @@ function build() {
       const a = us[k], b = us[k + 1], mid = (a + b) / 2;
       const h = holes.find(h => mid > h.u0 && mid < h.u1);
       const parts = h ? [[0, h.sill], [h.sill + h.height, H]] : [[0, H]];
-      parts.forEach(([z0, z1]) => { const m = boxBetween(a, b, z0, Math.min(z1, H), w, mat); if (m) grp.add(m); });
+      parts.forEach(([z0, z1]) => {
+        const m = boxBetween(a, b, z0, Math.min(z1, H), w, mat);
+        if (!m) return;
+        m.userData.id = wid; grp.add(m); pickables.push(m);
+        if (wid === sel) outline(m);
+      });
     }
     root.add(grp); wallGroups.push(grp);
 
@@ -453,6 +477,7 @@ function build() {
     if (!w || hid.has(o.id)) return;
     const picked = o.id === sel;
     if (o.type === 'portal') return placePortal(o, w, picked);
+    if (o.type === 'table') return placeTable(o, w, picked);
     if (o.model && models[o.model]) return placeModel(o, w, picked);
     // other objects that ask for a cut-out in this one (a sink in the worktop): rectangles in wall coordinates
     const cuts = R.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id)).map(c => ({
@@ -515,6 +540,11 @@ function build() {
 // ---------- the rest of the flat (apartment.yaml): floors, wall boxes, glass, furniture boxes ----------
 // Plan boxes are [x0, y0, x1, y1] (+ [z0, z1]) in this room's frame. Walls do not cast shadows, so showing
 // the flat never darkens the room being designed; they take part in the cutaway (updateWalls).
+// orange outline of the selected wall, drawn on top
+const outline = m => {
+  const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
+  l.renderOrder = 10; m.add(l);
+};
 const planBox = (b, z0, z1, mat) => {
   const [x0, x1] = [Math.min(b[0], b[2]), Math.max(b[0], b[2])], [y0, y1] = [Math.min(b[1], b[3]), Math.max(b[1], b[3])];
   const m = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * S, (z1 - z0) * S, (y1 - y0) * S), mat);
@@ -528,13 +558,14 @@ function buildAptRoom(r) {
       new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
     fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
     const wm = wallMat();
-    r.walls.forEach(b => {
+    const wallBox = (m, id) => { m.userData.id = id; root.add(m); aptWalls.push(m); pickables.push(m); if (id === sel) outline(m); };
+    r.walls.forEach((b, k) => {
       const m = planBox(b, b.length > 4 ? b[4] : 0, b.length > 4 ? b[5] : H, wm);
-      m.receiveShadow = true; root.add(m); aptWalls.push(m);
+      m.receiveShadow = true; wallBox(m, `${r.id}:w${k}`);
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
     });
     const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
-    r.glass.forEach(b => { const m = planBox(b, b[4], b[5], gm); root.add(m); aptWalls.push(m); });
+    r.glass.forEach((b, k) => wallBox(planBox(b, b[4], b[5], gm), `${r.id}:g${k}`));
     const xs = r.floor.map(p => p[0]), ys = r.floor.map(p => p[1]);
     addLabel(`${r.name}${r.area_m2 ? ' · ' + r.area_m2 + ' м²' : ''}`,
       P((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, 3), '', root);
@@ -626,6 +657,30 @@ function placePortal(o, w, picked) {
     piece(u1 - th, u1, t0, z0, z1 - th);            // the other leg
     piece(u0, u1, t0, z1 - th, z1);                 // top bar
   }
+  if (picked) selectionBox(o, w);
+}
+// ---------- table: a slab on four square legs, no carcass (type: table) ----------
+// height = to the top surface, top = slab thickness, leg = leg section; legs stand 5 cm in from the slab edges.
+// kitchen: true -> the slab in kitchen_colors.worktop (reads as a continuation of the worktop); legs in `color`.
+function placeTable(o, w, picked) {
+  const th = Math.min(o.top || 4, o.height), lg = Math.min(o.leg || 5, o.width / 2, o.depth / 2);
+  const ins = Math.min(5, (o.width - 2 * lg) / 2, (o.depth - 2 * lg) / 2);
+  const line = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .25 });
+  const piece = (u0, u1, t0, t1, z0, z1, color, rough) => {
+    const g = new THREE.BoxGeometry((u1 - u0) * S, (z1 - z0) * S, (t1 - t0) * S);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: rough }));
+    const u = (u0 + u1) / 2, t = (t0 + t1) / 2;
+    m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, (z0 + z1) / 2));
+    m.rotation.y = Math.atan2(w.dy, w.dx);
+    m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
+    m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), line));
+    root.add(m); pickables.push(m);
+  };
+  const u0 = o.position, u1 = o.position + o.width, t0 = o.gap, t1 = o.gap + o.depth;
+  const z0 = o.elevation, z1 = o.elevation + o.height;
+  piece(u0, u1, t0, t1, z1 - th, z1, o.kitchen === true ? R.kitchen.worktop : o.color, .3);
+  [[u0 + ins, t0 + ins], [u1 - ins - lg, t0 + ins], [u0 + ins, t1 - ins - lg], [u1 - ins - lg, t1 - ins - lg]]
+    .forEach(([u, t]) => piece(u, u + lg, t, t + lg, z0, z1 - th, o.color, .4));
   if (picked) selectionBox(o, w);
 }
 build();
@@ -770,19 +825,19 @@ const camDir = new THREE.Vector3();
 function updateWalls() {
   camDir.subVectors(camera.position, controls.target).normalize();
   wallGroups.forEach(g => {
-    const { w, labels } = g.userData;
+    const { w, wid, labels } = g.userData;
     // a wall between the camera and the room disappears with its window/door and labels; outward normal in three coords: (nx, 0, -ny).
     // The 0.2 margin keeps side-on walls (e.g. in the top view) in place.
-    g.visible = !(cutaway && w.nx * camDir.x - w.ny * camDir.z > .2);
+    g.visible = !(!solid.has(wid) && w.nx * camDir.x - w.ny * camDir.z > .2);
     labels.forEach(l => { l.visible = g.visible; });
   });
   // apartment walls: cut away those standing between the camera and a room-sized box around the orbit target
   // (looking at the kitchen hides the rooms in front of it; pan to the corridor and it opens up the same way)
   const dx = camDir.x, dy = -camDir.z, len = Math.hypot(dx, dy);
-  const cut = cutaway && len > .2, ux = dx / len, uy = dy / len;
+  const cut = len > .2, ux = dx / len, uy = dy / len;
   const tx = controls.target.x / S, ty = -controls.target.z / S;
   const reach = Math.abs(ux) * (maxX - minX) / 2 + Math.abs(uy) * (maxY - minY) / 2;
-  aptWalls.forEach(m => { m.visible = !(cut && (m.userData.c[0] - tx) * ux + (m.userData.c[1] - ty) * uy > reach); });
+  aptWalls.forEach(m => { m.visible = !(cut && !solid.has(m.userData.id) && (m.userData.c[0] - tx) * ux + (m.userData.c[1] - ty) * uy > reach); });
 }
 
 R.walls.forEach(w => {
@@ -792,7 +847,6 @@ R.walls.forEach(w => {
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
 btn('bpersp').onclick = () => setProj(false);
 btn('bortho').onclick = () => setProj(true);
-btn('bwalls').onclick = e => { cutaway = !cutaway; e.target.classList.toggle('on', cutaway); saveUi(); };
 btn('blabels').onclick = e => { const on = document.body.classList.toggle('hide-labels'); e.target.classList.toggle('on', !on); saveUi(); };
 btn('bao').onclick = e => { ao = !ao; e.target.classList.toggle('on', ao); saveUi(); };
 btn('bzones').onclick = e => { zoneGroup.visible = !zoneGroup.visible; e.target.classList.toggle('on', zoneGroup.visible); saveUi(); };
@@ -807,7 +861,7 @@ btn('bapt').onclick = () => {
 // ---------- outliner + inspector (right panel) ----------
 const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18 18 0 0 1 5.1-5.9M9.9 4.2A10.7 10.7 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.2 3.2M1 1l22 22"/></svg>';
-const swatch = it => (it.kitchen === 'panel' ? R.kitchen.carcass : it.kitchen && R.kitchen.facade) || it.color || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
+const swatch = it => (it.kitchen === 'panel' ? R.kitchen.carcass : it.type === 'table' && it.kitchen ? R.kitchen.worktop : it.kitchen && R.kitchen.facade) || it.color || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
 let inputs = {};
 
 // kitchen palette: three colour pickers in the left panel; a change is one undo step per colour drag
@@ -830,6 +884,15 @@ function eye(off, fn) {
   const b = el('button', 'eye'); b.innerHTML = off ? EYE_OFF : EYE; b.title = off ? 'Показать' : 'Скрыть'; b.onclick = fn;
   return b;
 }
+// cutaway toggle of a wall: scissors = cut away while seen from outside, plain wall = always visible from both sides
+const SCISSORS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>';
+const SOLID = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 12h18M9 5v7M15 12v7"/></svg>';
+function cutBtn(cut, fn) {
+  const b = el('button', 'eye'); b.innerHTML = cut ? SCISSORS : SOLID; b.onclick = fn;
+  b.title = cut ? 'Срез: скрывается, когда камера снаружи. Нажмите — видна всегда' : 'Видна всегда, с обеих сторон. Нажмите — срез';
+  return b;
+}
+function setSolid(ids, on) { record(); ids.forEach(id => on ? solid.add(id) : solid.delete(id)); renderTree(); renderEditor(); saveUi(); }
 function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); saveUi(); }
 function select(id) {
   sel = id; build(); renderTree(); renderEditor(); saveUi();
@@ -849,28 +912,38 @@ document.querySelectorAll('#mbar button').forEach(b => b.onclick = () => sheet(b
 
 function renderTree() {
   const tree = btn('tree'); tree.replaceChildren();
-  const groups = new Map([['Проёмы', R.holes]]);
+  const kWalls = WALLS.filter(x => x.w);
+  const groups = new Map([['Стены', kWalls], ['Проёмы', R.holes]]);
   R.objects.forEach(o => { if (!groups.has(o.group)) groups.set(o.group, []); groups.get(o.group).push(o); });
-  // other rooms: one group each, "walls and floor" first (not selectable: nothing to edit), then the furniture
+  // other rooms: one group each, "walls and floor" first (eye only: hides the whole shell), its wall boxes, then the furniture
   R.apartment.forEach(r => groups.set(r.name,
-    [{ id: shellId(r), label: 'Стены и пол', shell: true, color: r.floor_color || '#8b7560' }, ...r.items]));
+    [{ id: shellId(r), label: 'Стены и пол', shell: true, color: r.floor_color || '#8b7560' }, ...WALLS.filter(x => x.wallOf === r), ...r.items]));
   btn('bapt').classList.toggle('on', !aptIds.every(id => hid.has(id)));
   groups.forEach((list, name) => {
     if (R.apartment.length && name === R.apartment[0].name) tree.append(el('h2', 'aptsep', 'Квартира'));
-    const hideable = list !== R.holes, ids = list.map(o => o.id);
+    const hideable = list !== R.holes && list !== kWalls, ids = list.filter(o => !wallRow(o.id)).map(o => o.id);
+    const wids = list.filter(o => wallRow(o.id)).map(o => o.id);
     const d = el('details'); d.open = !collapsed.has(name);
     d.ontoggle = () => { d.open ? collapsed.delete(name) : collapsed.add(name); saveUi(); };
     const s = el('summary'); s.append(el('span', '', name), el('span', 'cnt', String(list.length)));
+    if (wids.length) {                                       // one click: cutaway on / off for every wall of the group
+      const allCut = wids.every(id => !solid.has(id));
+      s.append(cutBtn(allCut, e => { e.preventDefault(); e.stopPropagation(); setSolid(wids, allCut); }));
+    }
     if (hideable) {
       const allOff = ids.every(id => hid.has(id));
-      s.append(eye(allOff, e => { e.preventDefault(); e.stopPropagation(); setHidden(ids, !allOff); }));
+      const b = eye(allOff, e => { e.preventDefault(); e.stopPropagation(); setHidden(ids, !allOff); });
+      if (wids.length) b.style.marginLeft = '0';                // both icons together at the right edge
+      s.append(b);
     }
     d.append(s);
     list.forEach(it => {
-      const r = el('div', 'item' + (it.id === sel ? ' sel' : '') + (hid.has(it.id) ? ' off' : ''));
+      const isWall = !!wallRow(it.id), off = hid.has(it.id) || (it.wallOf && hid.has(shellId(it.wallOf)));
+      const r = el('div', 'item' + (it.id === sel ? ' sel' : '') + (off ? ' off' : ''));
       const sw = el('i', 'sw'); sw.style.background = swatch(it);
       r.append(sw, el('span', 'nm', it.label));
-      if (hideable) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
+      if (isWall) r.append(cutBtn(!solid.has(it.id), e => { e.stopPropagation(); setSolid([it.id], !solid.has(it.id)); }));
+      else if (hideable) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
       r.onclick = it.shell ? () => setHidden([it.id], !hid.has(it.id)) : () => select(it.id);
       d.append(r);
     });
@@ -888,13 +961,26 @@ const sections = it => it.room ? [
 ] : [
   ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола']]],
   ['Размер', [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
+  ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
   ...(it.type === 'portal' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки (в глубину)'], ['rail_thickness', 'Толщина рейки']]]] : []),
 ];
 
 function renderEditor() {
-  const it = byId(sel);
+  const wr = wallRow(sel), it = wr || byId(sel);
   btn('editor').hidden = !it; btn('empty').hidden = !!it;
   if (!it) return;
+  if (wr) {                                                   // a wall: only its cutaway setting
+    btn('esw').style.background = wr.color; btn('etitle').textContent = wr.label;
+    btn('esub').textContent = wr.w ? `Стена кухни · ${Math.round(wr.w.length || wr.w.L)} см` : wr.wallOf.name;
+    btn('eundo').hidden = true; inputs = {};
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = !solid.has(wr.id);
+    cb.onchange = () => setSolid([wr.id], !cb.checked);
+    const l = el('label', 'chk'); l.append(cb, el('span', '', 'Срез — скрывать, когда камера снаружи'));
+    btn('fields').replaceChildren(l);
+    btn('ehint').textContent = 'Срез включён: стена исчезает, когда камера смотрит на неё снаружи, чтобы не мешала видеть комнату.\n'
+      + 'Выключен: стена видна всегда, с обеих сторон.';
+    return;
+  }
   btn('esw').style.background = swatch(it);
   btn('etitle').textContent = it.label;
   btn('esub').textContent = it.wall ? `Стена ${it.wall}` : it.room ? roomById(it.room).name : it.group;
@@ -973,8 +1059,8 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
-  // the raycaster ignores `visible`, so skip openings of a hidden wall by hand
-  select(ray.intersectObjects(pickables.filter(o => o.parent.visible), false)[0]?.object.userData.id ?? null);
+  // the raycaster ignores `visible`, so skip cut-away walls and the openings of a hidden wall by hand
+  select(ray.intersectObjects(pickables.filter(o => o.visible && o.parent.visible), false)[0]?.object.userData.id ?? null);
 });
 addEventListener('keydown', e => {
   if (btn('ydlg').open) return;
@@ -983,6 +1069,38 @@ addEventListener('keydown', e => {
   e.preventDefault();                                                                  // instead of the browser's own text undo
   if (e.code === 'KeyY' || e.shiftKey) step(redo, undo); else step(undo, redo);
 });
+// ---------- free flight: WASD (+ Q/E down/up) moves the camera and the orbit target together; -/+ change the speed ----------
+const FLY = { KeyW: [0, 0, 1], KeyS: [0, 0, -1], KeyA: [-1, 0, 0], KeyD: [1, 0, 0], KeyQ: [0, -1, 0], KeyE: [0, 1, 0] };
+const held = new Set();
+let speed = clamp(+ui.speed || 1, .05, 20), speedTimer;                         // m/s
+const typing = () => document.activeElement?.matches('input, textarea, select');
+addEventListener('keydown', e => {
+  if (btn('ydlg').open || e.ctrlKey || e.metaKey || e.altKey || typing()) return;
+  if (FLY[e.code]) { held.add(e.code); e.preventDefault(); return; }
+  const k = { Minus: 1 / 1.5, NumpadSubtract: 1 / 1.5, Equal: 1.5, NumpadAdd: 1.5 }[e.code];
+  if (!k) return;
+  e.preventDefault();
+  speed = clamp(speed * k, .05, 20); saveUi();
+  const s = btn('speed'); s.textContent = `Скорость камеры: ${speed < 1 ? speed.toFixed(2) : speed.toFixed(1)} м/с`;
+  s.classList.add('show'); clearTimeout(speedTimer); speedTimer = setTimeout(() => s.classList.remove('show'), 1200);
+});
+addEventListener('keyup', e => held.delete(e.code));
+addEventListener('blur', () => held.clear());                                      // no stuck keys after Alt+Tab
+const fwd = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), move = new THREE.Vector3();
+let lastT = performance.now();
+function fly() {
+  const now = performance.now(), dt = Math.min((now - lastT) / 1000, .1); lastT = now;
+  if (!held.size) return;
+  // orthographic: moving along the view does not change the picture, so W/S go "up the screen" instead
+  if (isOrtho) fwd.set(0, 1, 0).applyQuaternion(camera.quaternion); else camera.getWorldDirection(fwd);
+  right.set(1, 0, 0).applyQuaternion(camera.quaternion);                          // screen right
+  move.set(0, 0, 0);
+  held.forEach(c => { const [x, y, z] = FLY[c]; move.addScaledVector(right, x).addScaledVector(up, y).addScaledVector(fwd, z); });
+  if (!move.lengthSq()) return;
+  move.normalize().multiplyScalar(speed * dt);
+  camera.position.add(move); controls.target.add(move);
+}
+
 btn('bundo').onclick = () => step(undo, redo);
 btn('bredo').onclick = () => step(redo, undo);
 syncHist();
@@ -1003,14 +1121,14 @@ if (location.hash !== '#top' && Array.isArray(ui.cam?.p) && Array.isArray(ui.cam
   camera.zoom = ui.cam.z || 1; camera.updateProjectionMatrix(); quietly(() => controls.update());
 }
 markView();
-btn('bwalls').classList.toggle('on', cutaway); btn('bao').classList.toggle('on', ao);
+btn('bao').classList.toggle('on', ao);
 document.body.classList.toggle('hide-labels', ui.labels === false); btn('blabels').classList.toggle('on', ui.labels !== false);
 zoneGroup.visible = !!ui.zones; btn('bzones').classList.toggle('on', zoneGroup.visible);
 // the user moved the camera by hand: it is no longer in any of the preset views
 controls.addEventListener('change', () => { if (!quiet && view) { view = ''; markView(); } saveUi(); });
 renderTree(); renderEditor(); refresh(); syncKitchen();
 renderer.setAnimationLoop(() => {
-  controls.update(); updateWalls();
+  fly(); controls.update(); updateWalls();
   // near plane follows the zoom: 1 mm in close-ups, 5 cm from afar (keeps depth precision, no flicker)
   const near = clamp(camera.position.distanceTo(controls.target) / 20, .001, .05);
   if (!isOrtho && Math.abs(persp.near - near) > 1e-5) { persp.near = near; persp.updateProjectionMatrix(); }
