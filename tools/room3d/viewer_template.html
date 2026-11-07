@@ -190,6 +190,13 @@ R.walls.forEach((w, i) => {
   });
 });
 
+// corner letters (A, B, C...) just outside each corner
+R.walls.forEach((w, i) => {
+  const prev = R.walls[(i - 1 + N) % N];
+  const ox = (w.nx + prev.nx), oy = (w.ny + prev.ny);
+  addLabel(w.id.split('-')[0], P(w.a[0] + ox * 30, w.a[1] + oy * 30, H + 5), 'dim');
+});
+
 // ---------- boxes from bboxes ----------
 function prism(bbox, z0, h, color, opts = {}) {
   const shape = new THREE.Shape(bbox.map(p => new THREE.Vector2(p[0] * S, p[1] * S)));
@@ -262,8 +269,10 @@ function addLabel(text, pos, cls) { const l = makeLabel(text, cls); l.position.c
 const target = P(cx, cy, 0);
 sun.position.copy(P(cx - span, cy - span * 0.6, 600)); sun.target.position.copy(target); scene.add(sun.target);
 const sc = sun.shadow.camera; sc.left = sc.bottom = -span * S; sc.right = sc.top = span * S; sc.far = 40;
-function view3d() { camera.position.copy(P(cx - span * .55, cy - span * .95, span * .9)); controls.target.copy(target); controls.update(); }
-function viewTop() { camera.position.copy(P(cx, cy - 1, span * 1.55)); controls.target.copy(target); controls.update(); }
+function setFov(f) { camera.fov = f; camera.updateProjectionMatrix(); }
+function view3d() { setFov(45); camera.position.copy(P(cx - span * .55, cy - span * .95, span * .9)); controls.target.copy(target); controls.update(); }
+// near-orthographic top view: narrow FOV from far away, so wall tops don't hide the floor
+function viewTop() { setFov(12); camera.position.copy(P(cx, cy - 1, span * 5.6)); controls.target.copy(target); controls.update(); }
 view3d();
 
 let cutaway = true;
@@ -292,6 +301,7 @@ function resize() {
   camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize); resize();
+if (location.hash === '#top') { btn('btop').click(); }
 renderer.setAnimationLoop(() => { controls.update(); updateWalls(); renderer.render(scene, camera); labelRenderer.render(scene, camera); });
 window.__ready = true;
 </script>
