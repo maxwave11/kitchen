@@ -32,7 +32,7 @@ VIEWER = ROOT / "viewer"
 LOCK = threading.Lock()                          # one save / rebuild at a time
 
 NUMBERS = {"position", "gap", "elevation", "rotation", "width", "depth", "height", "top",
-           "rails", "rail_width", "rail_thickness", "leg", "sill"}
+           "rails", "rail_width", "rail_thickness", "leg", "sill", "mullion", "doors", "panel", "stand"}
 COLORS = {"facade", "carcass", "worktop"}
 LINK = re.compile(r"^=[\w\s.+\-*/()]*$")        # "=lower.height + lower.top"
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")

@@ -52,6 +52,10 @@ windows:
     sill_height: 85     # TODO
     height: 150         # TODO
     type: casement
+    # PVC double-glazed unit from Maxim's photo (2026-11-08): two panes split by a mullion; the narrower one at corner D
+    # is the opening sash (handle at the mullion), the wider one at A is fixed glazing. Mullion position is an estimate.
+    mullion: 62         # cm from the window's edge at corner D to the mullion centre
+    opens: start        # start = the pane at corner D opens
 openings:
   # Wall confirmed by Maxim; position/width set in the 3D viewer (2026-11-07).
   - id: door-1
@@ -260,16 +264,76 @@ objects:
     color: "#6e655c"
     model: assets/models/cor-jalis-522-counter-stool.glb
 
-  # Sofa couch_015 from Maxim's sources/couch_015.max (2026-11-08): back to the long wall A-B, faces north.
+  # Sofa couch_015 from Maxim's sources/couch_015.max (2026-11-08). Moved to wall C-D, its end at the window wall,
+  # as on Maxim's photo (sofa to the right of the window); the TV stands opposite, on A-B.
   - id: sofa
     label: "Диван couch_015"
-    wall: A-B
-    position: 0
+    wall: C-D
+    position: 283.5
     width: 235.6
     depth: 83.5
     height: 50.4
     color: "#8a8f98"
     model: assets/models/couch-015.glb
+
+  # Radiator under the window (Maxim's photo, 2026-11-08): steel panel type 22, profiled front, thermostatic valve on the
+  # corner-D side, its end in line with the window edge there. Sizes estimated from the photo - measure.
+  - id: radiator
+    label: "Радиатор"
+    type: radiator
+    wall: D-A
+    position: "=window.position + 6"
+    gap: 4
+    elevation: 12
+    width: 100
+    depth: 10
+    height: 60
+    valve: start
+    color: "#f5f5f3"
+
+  # TV set (Maxim's photo, 2026-11-08): a low cabinet with 3 white doors on a black-brown body, LG OLED 65" on its pedestal.
+  # Cabinet size estimated from the photo; TV = LG OLED65 C-series (144.1 x 82.6 x 4.6 panel, 23 cm pedestal) - exact model to confirm.
+  - id: tv-set
+    label: "ТВ-зона"
+    type: group
+  - id: tv-stand
+    label: "Тумба под ТВ"
+    parent: tv-set
+    wall: A-B
+    position: 40
+    gap: 2
+    width: 180
+    depth: 40
+    height: 64
+    doors: 3
+    facade: "#f2f1ec"
+    color: "#2a2522"
+  - id: tv
+    label: "Телевизор LG OLED 65\""
+    parent: tv-set
+    type: tv
+    wall: A-B
+    position: "=tv-stand.position + tv-stand.width - width - 10"
+    gap: "=tv-stand.gap + 6"
+    elevation: "=tv-stand.elevation + tv-stand.height"
+    width: 144.1
+    depth: 23
+    height: 86.5
+    panel: 1
+    stand: 3.9
+    color: "#111111"
+
+  # Rug (Maxim's photo): light grey with worn blue / terracotta stripes, between the TV and the sofa. Size estimated - measure.
+  - id: rug
+    label: "Ковёр"
+    type: rug
+    wall: A-B
+    position: 24
+    gap: 50
+    width: 160
+    depth: 230
+    height: 1
+    color: "#cdc9c2"
 
 zones: []
 focal_point:
@@ -309,4 +373,7 @@ notes: |
   2026-11-08: sofa 'couch_015' (235.6 x 83.5 x 50.4, grey fabric) from Maxim's sources/couch_015.max (assets/models/couch-015.glb;
     first tried 'Waw' .3ds sofa - removed, Maxim did not like it). Back to wall A-B from corner A, faces north; units guessed as
     inches (height 50 cm is low for a sofa - ask Maxim for the real size), the exact place is not decided.
+  2026-11-08: from Maxim's photos: window drawn as a PVC double-glazed unit (mullion, opening sash at D, fixed pane at A);
+    radiator under it; TV set on A-B (cabinet 180 x 40 x 64 with 3 doors + LG OLED 65" with a mirror-like screen); rug
+    160 x 230 between TV and sofa; sofa moved to C-D at the window wall (as on the photo). All sizes estimated from the photos.
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).

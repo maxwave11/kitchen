@@ -325,8 +325,9 @@ function saveUi() {                                // debounced: camera 'change'
 // stay in localStorage and "Просмотреть YAML" shows what to paste. A stored edit is dropped if the YAML value it was made
 // against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
-const KEYS = { hole: ['position', 'width', 'height', 'sill'],
-  object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'] };   // rails*: type portal, leg: type table
+const KEYS = { hole: ['position', 'width', 'height', 'sill', 'mullion'],                                     // mullion: windows
+  object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg',
+           'doors', 'panel', 'stand'] };   // rails*: type portal, leg: type table, doors: any box, panel / stand: type tv
 const kindOf = it => it.kind ? 'hole' : 'object';
 const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
@@ -432,7 +433,7 @@ if (SERVER) {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
   addEventListener('pagehide', () => { if (pendingChanges().length) pushEdits(true); });
 } else {
-  setSaved('', 'Сервер не запущен: правки только в этом браузере');
+  setSaved('bad', '⚠ Нет связи с сервером сохранения: правки останутся только в этом браузере и в YAML НЕ попадут. Запустите tools/room3d/serve.py и обновите страницу.');
 }
 
 // Everything stands on a wall: `position`/`width` run along it, `gap`+`depth` go from it into the room, so a
@@ -451,6 +452,7 @@ const rangeOf = (it, k) => {
     gap: [-(it.depth + 40), perp - it.depth], top: [0, 10],   // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
     rails: [1, 40], rail_width: [.5, it.depth / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
     leg: [1, Math.min(it.width, it.depth) / 2],
+    mullion: [10, it.width - 10], doors: [0, 12], panel: [.5, it.depth], stand: [0, it.height - 10],
   })[k];
 };
 // ---------- undo / redo of document changes (item sizes and positions, hidden objects; not the camera) ----------
@@ -488,7 +490,7 @@ function applyPatch(it, patch) {
 }
 function setField(it, k, v) {
   record(it.id + '.' + k);
-  applyPatch(it, { [k]: k === 'rails' ? Math.round(v) : v });
+  applyPatch(it, { [k]: k === 'rails' || k === 'doors' ? Math.round(v) : v });
 }
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f72, .5));
@@ -543,7 +545,8 @@ const root = new THREE.Group(); scene.add(root);   // walls, openings, objects: 
 function clearRoot() {
   // CSS2DRenderer only drops the DOM label of an object removed directly from its parent, not of one inside a removed group
   root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
-  root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); o.material?.dispose(); } });   // model meshes are reused
+  reflectors.splice(0).forEach(m => m.rt.dispose());                                   // TV mirrors: their render targets
+  root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); [o.material].flat().forEach(m => m?.dispose()); } });   // model meshes are reused
   root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0;
 }
 
@@ -622,17 +625,7 @@ function build() {
         grp.add(hl);
       }
       if (h.kind === 'window') {
-        const glass = new THREE.Mesh(new THREE.BoxGeometry(h.width * S, h.height * S, 1.5 * S),
-          new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 }));
-        glass.position.copy(at); glass.rotation.y = rotY;
-        grp.add(glass);
-        if (h.sill > 0) {
-          const sill = new THREE.Mesh(new THREE.BoxGeometry(h.width * S, 3 * S, (T + 8) * S),
-            new THREE.MeshStandardMaterial({ color: 0xffffff }));
-          sill.position.copy(P(base[0] + w.nx * (T / 2 - 4), base[1] + w.ny * (T / 2 - 4), h.sill - 1.5));
-          sill.rotation.y = rotY;
-          grp.add(sill);
-        }
+        buildWindow(h, w, grp);
         wallLabel(`${h.id} · ${r1(h.width)}×${r1(h.height)}, подоконник ${r1(h.sill)}`, P(base[0] - w.nx * 10, base[1] - w.ny * 10, h.sill + h.height + 8), 'hole');
       } else {
         wallLabel(`${h.id} · ${r1(h.width)}×${r1(h.height)}${h.to ? ' → ' + h.to : ''}`, P(base[0] - w.nx * 10, base[1] - w.ny * 10, h.height + 8), 'hole');
@@ -646,6 +639,9 @@ function build() {
     const picked = underSel(o);
     if (o.type === 'portal') return placePortal(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
+    if (o.type === 'tv') return placeTv(o, w, picked);
+    if (o.type === 'radiator') return placeRadiator(o, w, picked);
+    if (o.type === 'rug') return placeRug(o, w, picked);
     if (o.model && models[o.model]) return placeModel(o, w, picked);
     // other objects that ask for a cut-out in this one (a sink in the worktop): rectangles in wall coordinates
     const cuts = room.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id)).map(c => ({
@@ -698,6 +694,19 @@ function build() {
       m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
       root.add(m); pickables.push(m);
     }
+    if (o.doors >= 1 && !o.kitchen) {                // N equal doors over the front, 3 mm apart, 2 mm in from the body edges
+      const n = Math.round(o.doors), gp = .3, dw = (o.width - .4 - gp * (n - 1)) / n;
+      const mat = new THREE.MeshStandardMaterial({ color: o.facade || '#f2f0eb', roughness: .4 });
+      const line = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 });
+      for (let i = 0; i < n; i++) {
+        const g = new THREE.BoxGeometry(dw * S, (o.height - .4) * S, 1.8 * S), m = new THREE.Mesh(g, mat);
+        const u = o.position + .2 + dw / 2 + i * (dw + gp), t = o.gap + o.depth + .9;
+        m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
+        m.rotation.y = Math.atan2(w.dy, w.dx); m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
+        m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), line));
+        root.add(m); pickables.push(m);
+      }
+    }
     if (o.id === sel) {
       const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
       l.position.set(0, (o.height + (o.top || 0)) * S / 2 + .08, 0); body.add(l);
@@ -711,6 +720,65 @@ function build() {
     spin(o, w, n0);
   }));
   R.apartment.forEach(buildRoomShell);
+}
+
+// ---------- window: white PVC frame, mullion, fixed pane / opening sash, double glazing, sill with ears ----------
+// Wall coordinates: u along the wall (cm from its first corner), t across it (0 = the room-side face, + = outwards), z up.
+// The 7 cm frame sits at the outer face of the wall, so the reveal (откос) shows on the room side.
+const PVC = { frame: 6.5, mullion: 8.4, sash: 5.6, bead: 1.6, deep: 7 };
+function wallPiece(w, u0, u1, t0, t1, z0, z1, mat, into) {
+  const g = new THREE.BoxGeometry(Math.abs(u1 - u0) * S, Math.abs(z1 - z0) * S, Math.abs(t1 - t0) * S);
+  const m = new THREE.Mesh(g, mat), u = (u0 + u1) / 2, t = (t0 + t1) / 2;
+  m.position.copy(P(w.a[0] + w.dx * u + w.nx * t, w.a[1] + w.dy * u + w.ny * t, (z0 + z1) / 2));
+  m.rotation.y = Math.atan2(w.dy, w.dx); m.castShadow = m.receiveShadow = true;
+  into.add(m); return m;
+}
+function buildWindow(h, w, grp) {
+  const pvc = new THREE.MeshStandardMaterial({ color: h.frame_color || '#f4f4f2', roughness: .35 });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xd6ecef, transparent: true, opacity: .16, roughness: .03,
+    metalness: 0, envMapIntensity: 1.4, depthWrite: false, side: THREE.DoubleSide });
+  const spacer = new THREE.MeshStandardMaterial({ color: 0x8e9296, roughness: .5, metalness: .6 });
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0xf7f7f5, roughness: .25 });
+  const u0 = h.position, u1 = h.position + h.width, z0 = h.sill, z1 = h.sill + h.height;
+  const tf0 = T - PVC.deep, tf1 = T;                                   // frame depth inside the wall
+  const box = (a, b, c, d, e, f, m = pvc) => wallPiece(w, a, b, c, d, e, f, m, grp);
+  const F = Math.min(PVC.frame, h.width / 4, h.height / 4);
+  box(u0, u0 + F, tf0, tf1, z0, z1); box(u1 - F, u1, tf0, tf1, z0, z1);                      // outer frame
+  box(u0 + F, u1 - F, tf0, tf1, z0, z0 + F); box(u0 + F, u1 - F, tf0, tf1, z1 - F, z1);
+  // panes between the frame and the mullion; `start` = the one nearer the wall's first corner
+  const mu = h.mullion > F + 10 && h.mullion < h.width - F - 10 ? u0 + h.mullion : null;
+  if (mu != null) box(mu - PVC.mullion / 2, mu + PVC.mullion / 2, tf0, tf1, z0 + F, z1 - F);
+  const panes = mu == null ? [['start', u0 + F, u1 - F, null]]
+    : [['start', u0 + F, mu - PVC.mullion / 2, 'end'], ['end', mu + PVC.mullion / 2, u1 - F, 'start']];
+  const pz0 = z0 + F, pz1 = z1 - F;
+  panes.forEach(([side, a, b, handleAt]) => {
+    const opens = h.opens === 'both' || h.opens === side;
+    let ga = a, gb = b, gz0 = pz0, gz1 = pz1;
+    if (opens) {                                                       // sash: a second frame, 5 mm proud of the main one
+      const s = Math.min(PVC.sash, (b - a) / 4), st0 = tf0 - .5, st1 = tf1 - 1.5;
+      box(a, a + s, st0, st1, pz0, pz1); box(b - s, b, st0, st1, pz0, pz1);
+      box(a + s, b - s, st0, st1, pz0, pz0 + s); box(a + s, b - s, st0, st1, pz1 - s, pz1);
+      ga = a + s; gb = b - s; gz0 = pz0 + s; gz1 = pz1 - s;
+      // handle on the side away from the hinges: at the mullion (or at the end of a single sash), mid-height
+      const hu = handleAt === 'end' ? b - s / 2 : a + s / 2, hz = (pz0 + pz1) / 2;
+      box(hu - 1.5, hu + 1.5, st0 - 1.4, st0, hz - 4.5, hz + 4.5, handleMat);                 // rosette
+      box(hu - 1, hu + 1, st0 - 4.2, st0 - 1.4, hz - 1, hz + 1.5, handleMat);                 // neck
+      box(hu - .9, hu + .9, st0 - 4.2, st0 - 2.6, hz - 13, hz - .5, handleMat);               // lever, pointing down (closed)
+    }
+    // glazing bead + double-glazed unit: two panes 24 mm apart, a grey spacer frame round the edge
+    const B = PVC.bead, gt = (tf0 + tf1) / 2;
+    box(ga, ga + B, tf0 - .2, tf0 + 2, gz0, gz1); box(gb - B, gb, tf0 - .2, tf0 + 2, gz0, gz1);
+    box(ga + B, gb - B, tf0 - .2, tf0 + 2, gz0, gz0 + B); box(ga + B, gb - B, tf0 - .2, tf0 + 2, gz1 - B, gz1);
+    [gt - 1.4, gt + 1.4].forEach(t => {
+      const g = box(ga + B, gb - B, t - .2, t + .2, gz0 + B, gz1 - B, glassMat); g.castShadow = false; g.renderOrder = 2;
+    });
+    const sp = .9;
+    box(ga + B, gb - B, gt - 1.2, gt + 1.2, gz0 + B, gz0 + B + sp, spacer); box(ga + B, gb - B, gt - 1.2, gt + 1.2, gz1 - B - sp, gz1 - B, spacer);
+    box(ga + B, ga + B + sp, gt - 1.2, gt + 1.2, gz0 + B, gz1 - B, spacer); box(gb - B - sp, gb - B, gt - 1.2, gt + 1.2, gz0 + B, gz1 - B, spacer);
+  });
+  if (h.sill > 0) {                                                    // PVC sill: 6 cm proud of the wall, 5 cm ears into the reveal sides
+    box(u0 - 5, u1 + 5, -6, tf0, z0 - 2.2, z0 + .2, new THREE.MeshStandardMaterial({ color: 0xf6f6f4, roughness: .3 }));
+  }
 }
 
 // rotation (deg, clockwise seen from above) of an object about the vertical axis through the centre of its box: everything
@@ -867,6 +935,190 @@ function placeTable(o, w, picked) {
   piece(u0, u1, t0, t1, z1 - th, z1, o.kitchen === true ? palOf(o).worktop : o.color, .3);
   [[u0 + ins, t0 + ins], [u1 - ins - lg, t0 + ins], [u0 + ins, t1 - ins - lg], [u1 - ins - lg, t1 - ins - lg]]
     .forEach(([u, t]) => piece(u, u + lg, t, t + lg, z0, z1 - th, o.color, .4));
+  if (picked) selectionBox(o, w);
+}
+// ---------- objects drawn in a local frame: x = to the right of someone facing the wall, y = up, z = into the room ----------
+// The frame's origin is the centre of the object's footprint at its elevation. `su` = +1 / -1: local x runs along / against the
+// wall's direction (from its first corner), depending on which way round the room's outline goes.
+function localFrame(o, w) {
+  const up = new THREE.Vector3(0, 1, 0), inward = new THREE.Vector3(-w.nx, 0, w.ny), right = new THREE.Vector3(w.ny, 0, w.nx);
+  const g = new THREE.Group();
+  g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right, up, inward));
+  const u = o.position + o.width / 2, t = o.gap + o.depth / 2;
+  g.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation));
+  g.userData.su = w.ny * w.dx - w.nx * w.dy;
+  root.add(g);
+  return g;
+}
+function lbox(g, o, sx, sy, sz, x, y, z, mat, edges = 0) {           // a box sx × sy × sz (cm) centred at (x, y, z) in the frame
+  const geo = new THREE.BoxGeometry(sx * S, sy * S, sz * S), m = new THREE.Mesh(geo, mat);
+  m.position.set(x * S, y * S, z * S); m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
+  if (edges) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: edges })));
+  g.add(m); pickables.push(m);
+  return m;
+}
+
+// ---------- TV (type: tv): a thin panel on a pedestal; the screen is a planar mirror tinted almost black ----------
+// The mirror re-renders the scene from the reflected camera, so the room, the window and the light really show in it.
+// Like three.js Reflector, but (1) dark glass MULTIPLIES the reflection (Reflector overlays its tint, so bright things stay
+// bright) and (2) what lies behind the mirror is cut off by a clipping plane instead of Reflector's oblique near plane,
+// which only works for a perspective camera - so the mirror works with the orthographic camera too.
+const reflectors = [];
+const SCREEN_TINT = .12;                                               // share of the room the screen returns (linear): dark glass
+class Mirror extends THREE.Mesh {
+  constructor(geometry, { width, height }) {
+    const rt = new THREE.WebGLRenderTarget(width, height, { samples: 4, type: THREE.HalfFloatType });
+    super(geometry, new THREE.ShaderMaterial({
+      name: 'ScreenGlass',
+      uniforms: { color: { value: new THREE.Color().setRGB(SCREEN_TINT, SCREEN_TINT, SCREEN_TINT * 1.05) },
+                  tDiffuse: { value: rt.texture }, textureMatrix: { value: new THREE.Matrix4() } },
+      vertexShader: `
+        uniform mat4 textureMatrix;
+        varying vec4 vUv;
+        void main() { vUv = textureMatrix * vec4( position, 1.0 ); gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+      fragmentShader: `
+        uniform vec3 color;
+        uniform sampler2D tDiffuse;
+        varying vec4 vUv;
+        void main() {
+          gl_FragColor = vec4( texture2DProj( tDiffuse, vUv ).rgb * color, 1.0 );
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    }));
+    this.rt = rt; this.isMirror = true;
+    const cams = { persp: new THREE.PerspectiveCamera(), ortho: new THREE.OrthographicCamera() };
+    const pos = new THREE.Vector3(), camPos = new THREE.Vector3(), normal = new THREE.Vector3(), view = new THREE.Vector3();
+    const look = new THREE.Vector3(), target = new THREE.Vector3(), dir = new THREE.Vector3(), rot = new THREE.Matrix4();
+    const plane = new THREE.Plane(), tm = this.material.uniforms.textureMatrix.value;
+    this.render = (renderer, scene, camera) => {
+      pos.setFromMatrixPosition(this.matrixWorld); camPos.setFromMatrixPosition(camera.matrixWorld);
+      rot.extractRotation(this.matrixWorld); normal.set(0, 0, 1).applyMatrix4(rot);
+      camera.getWorldDirection(dir);
+      if (dir.dot(normal) >= 0 || (camera.isPerspectiveCamera && view.subVectors(pos, camPos).dot(normal) > 0)) return;   // seen from behind
+      const vc = camera.isOrthographicCamera ? cams.ortho : cams.persp;
+      view.subVectors(pos, camPos).reflect(normal).negate().add(pos);                 // the camera mirrored in the screen plane
+      rot.extractRotation(camera.matrixWorld);
+      look.set(0, 0, -1).applyMatrix4(rot).add(camPos);
+      target.subVectors(pos, look).reflect(normal).negate().add(pos);
+      vc.position.copy(view); vc.up.set(0, 1, 0).applyMatrix4(rot).reflect(normal); vc.lookAt(target);
+      vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix); vc.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+      tm.set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
+      tm.multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse).multiply(this.matrixWorld);
+      plane.setFromNormalAndCoplanarPoint(normal, pos); plane.constant += .002;      // keep only what is in front of the screen
+      const was = { rt: renderer.getRenderTarget(), shadow: renderer.shadowMap.autoUpdate, clip: renderer.clippingPlanes };
+      this.visible = false;
+      renderer.shadowMap.autoUpdate = false; renderer.clippingPlanes = [plane];
+      renderer.setRenderTarget(rt); renderer.state.buffers.depth.setMask(true);
+      if (renderer.autoClear === false) renderer.clear();
+      renderer.render(scene, vc);
+      renderer.setRenderTarget(was.rt); renderer.shadowMap.autoUpdate = was.shadow; renderer.clippingPlanes = was.clip;
+      this.visible = true;
+    };
+  }
+  dispose() { this.rt.dispose(); this.geometry.dispose(); this.material.dispose(); }
+}
+function placeTv(o, w, picked) {
+  const g = localFrame(o, w);
+  const st = clamp(o.stand ?? 4, 0, o.height - 10), pd = clamp(o.panel ?? 4.6, .5, o.depth), ph = o.height - st;
+  const body = new THREE.MeshStandardMaterial({ color: 0x141416, roughness: .45, metalness: .3 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: .3, metalness: .8 });
+  lbox(g, o, Math.min(o.width * .35, 60), 1.2, o.depth, 0, .6, 0, metal);                              // pedestal plate
+  lbox(g, o, Math.min(o.width * .18, 30), st + ph * .2, 2.5, 0, (st + ph * .2) / 2, -pd / 2 - 1.2, metal);   // neck behind the panel
+  lbox(g, o, o.width, ph, pd, 0, st + ph / 2, 0, body);                                                // panel
+  // screen: 6 mm bezel; glossy black glass and the mirror 0.3 mm in front of it
+  const sw = o.width - 1.2, sh = ph - 1.2, sy = st + ph / 2 + .1, sz = pd / 2 + .02;
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(sw * S, sh * S),
+    new THREE.MeshPhysicalMaterial({ color: 0x030304, roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 1.2 }));
+  glass.position.set(0, sy * S, sz * S); glass.userData.id = o.id; g.add(glass); pickables.push(glass);
+  const px = Math.min(2048, Math.round(innerWidth * renderer.getPixelRatio()));
+  const mirror = new Mirror(new THREE.PlaneGeometry(sw * S, sh * S), { width: px, height: Math.round(px * sh / sw) });
+  mirror.onBeforeRender = (r, sc, cam) => {
+    if (sc.overrideMaterial) return;                                   // not again for the AO depth / normal passes
+    // the mirror looks back into the room: walls cut away for the main camera (the one behind it) must show in it,
+    // the wall the TV hangs on (between the mirrored camera and the room) must not
+    const vis = wallGroups.map(g => g.visible);
+    wallGroups.forEach(g => { g.visible = !(o.room === MAIN.id && g.userData.w.id === o.wall); });
+    mirror.render(r, sc, cam);
+    wallGroups.forEach((g, i) => { g.visible = vis[i]; });
+  };
+  mirror.position.set(0, sy * S, (sz + .03) * S); mirror.userData.id = o.id;
+  g.add(mirror); pickables.push(mirror); reflectors.push(mirror);
+  if (picked) selectionBox(o, w);
+}
+
+// ---------- panel radiator (type: radiator): profiled front, top grille, thermostatic valve, supply pipe ----------
+function placeRadiator(o, w, picked) {
+  const g = localFrame(o, w), white = new THREE.MeshStandardMaterial({ color: 0xf5f5f3, roughness: .35, metalness: .1 });
+  const W = o.width, Hh = o.height, D = o.depth, zf = D / 2;
+  lbox(g, o, W, Hh - .6, D - .6, 0, Hh / 2, -.3, white, .15);                              // the two panels with fins in between
+  // front: vertical channels every ~3.3 cm (instanced half-round ribs), 3 cm plain at top and bottom
+  const n = Math.max(1, Math.floor((W - 2) / 3.3)), pitch = (W - 2) / n, rh = Hh - 6;
+  const rib = new THREE.InstancedMesh(new THREE.CylinderGeometry(.9 * S, .9 * S, rh * S, 10, 1, false, -Math.PI / 2, Math.PI), white, n);
+  const mtx = new THREE.Matrix4();
+  for (let i = 0; i < n; i++) rib.setMatrixAt(i, mtx.makeTranslation((-W / 2 + 1 + pitch * (i + .5)) * S, Hh / 2 * S, (zf - .9) * S));
+  rib.castShadow = rib.receiveShadow = true; rib.userData.id = o.id; g.add(rib); pickables.push(rib);
+  // top cover with slots
+  lbox(g, o, W, .4, D, 0, Hh - .2, 0, white);
+  const slots = Math.max(1, Math.floor((W - 4) / 1.6)), dark = new THREE.MeshStandardMaterial({ color: 0x55585c, roughness: .8 });
+  const slot = new THREE.InstancedMesh(new THREE.BoxGeometry(.6 * S, .05 * S, (D - 3) * S), dark, slots);
+  for (let i = 0; i < slots; i++) slot.setMatrixAt(i, mtx.makeTranslation((-W / 2 + 2 + 1.6 * (i + .5)) * S, (Hh + .03) * S, 0));
+  slot.userData.id = o.id; g.add(slot);
+  // thermostatic valve on the start / end side: stub, valve body, white head; supply pipe down to the floor
+  const side = (o.valve === 'start' ? -1 : 1) * g.userData.su, x = side * (W / 2 + 3), zc = 0;
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: .2, metalness: .9 });
+  const cyl = (r, h, cx, cy, mat, horiz) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r * S, r * S, h * S, 20), mat);
+    if (horiz) m.rotation.z = Math.PI / 2;
+    m.position.set(cx * S, cy * S, zc * S); m.castShadow = true; m.userData.id = o.id; g.add(m); pickables.push(m);
+  };
+  cyl(1, 4, side * (W / 2 + 1.5), Hh - 5, chrome, true);               // stub into the radiator
+  cyl(1.6, 6, x, Hh - 5, chrome);                                      // valve body
+  cyl(2.7, 8, x, Hh + 2, white);                                       // thermostatic head
+  const low = Hh - 8 + o.elevation;                                    // pipe from the valve to the floor
+  cyl(1, low, x, Hh - 8 - low / 2, chrome);
+  if (picked) selectionBox(o, w);
+}
+
+// ---------- rug (type: rug): a slab `height` thick (pile) with a worn striped pattern on top; stripes run along the width ----------
+const rugTex = new Map();                                              // one canvas per size + colour: build() runs on every edit
+function rugTexture(o) {
+  const key = `${Math.round(o.width)}x${Math.round(o.depth)}:${o.color}`;
+  if (rugTex.has(key)) return rugTex.get(key);
+  let seed = 11; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const cw = 1024, chh = Math.max(64, Math.round(1024 * o.depth / o.width));   // canvas x = width (along the wall), y = depth
+  const px = cw / o.width;                                                      // canvas px per cm
+  const c = document.createElement('canvas'); c.width = cw; c.height = chh;
+  const g = c.getContext('2d');
+  g.fillStyle = o.color || '#c9c5be'; g.fillRect(0, 0, cw, chh);
+  const tones = ['#8f9aa6', '#7d8794', '#c4917c', '#b98774', '#d9cfbf', '#6c6f74', '#e6e2dc', '#a7aeb5'];
+  for (let y = 6 * px; y < chh - 6 * px;) {                            // bands of grey-blue, dusty terracotta, sand, charcoal
+    const hgt = (.4 + rnd() * 2.2) * px, col = tones[Math.floor(rnd() * tones.length)];
+    for (let x = 4 * px; x < cw - 4 * px;) {                           // a band = short dashes with gaps: the worn look
+      const len = (1 + rnd() * 12) * px;
+      if (rnd() > .25) { g.globalAlpha = .22 + rnd() * .4; g.fillStyle = col; g.fillRect(x, y, Math.min(len, cw - 4 * px - x), hgt); }
+      x += len + rnd() * 2 * px;
+    }
+    y += hgt + rnd() * 3.5 * px;
+  }
+  g.globalAlpha = 1;
+  for (let i = 0; i < 2500; i++) {                                     // pale patches and dark speckles
+    g.fillStyle = rnd() > .5 ? 'rgba(240,238,234,.2)' : 'rgba(90,95,100,.1)';
+    g.fillRect(rnd() * cw, rnd() * chh, (1 + rnd() * 6) * px, (.3 + rnd()) * px);
+  }
+  g.strokeStyle = 'rgba(120,125,130,.6)'; g.lineWidth = 1.5 * px;      // a plain border 2.5 cm in
+  g.strokeRect(2.5 * px, 2.5 * px, cw - 5 * px, chh - 5 * px);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  rugTex.set(key, t);
+  return t;
+}
+function placeRug(o, w, picked) {
+  const g = localFrame(o, w), h = Math.max(.3, o.height);
+  const side = new THREE.MeshStandardMaterial({ color: o.color || '#c9c5be', roughness: 1 });
+  const top = new THREE.MeshStandardMaterial({ map: rugTexture(o), roughness: .95 });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(o.width * S, h * S, o.depth * S), [side, side, top, side, side, side]);
+  m.position.set(0, h / 2 * S, 0); m.receiveShadow = true; m.userData.id = o.id;
+  g.add(m); pickables.push(m);
   if (picked) selectionBox(o, w);
 }
 build();
@@ -1162,12 +1414,15 @@ const LABELS = { height: 'Высота', depth: 'Глубина', top: 'Стол
 const sections = it => it.kind ? [
   ['Положение', [['position', `От угла ${it.wall.split('-')[0]}`]]],
   ['Размер', [['width', 'Ширина'], ['height', 'Высота'], ...(it.kind === 'window' ? [['sill', 'Подоконник от пола']] : [])]],
+  ...(it.kind === 'window' && it.mullion != null ? [['Импост', [['mullion', `От края окна у угла ${it.wall.split('-')[0]}`]]]] : []),
 ] : isGroup(it) ? [
   ['Задано для вложенных объектов', Object.keys(it.def).filter(k => !PAL.some(([c]) => c === k)).map(k => [k, LABELS[k] || it.params[k]?.label || k])],
 ] : [
   ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола'], ['rotation', 'Поворот (по часовой, сверху)']]],
   ['Размер', [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
   ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
+  ...(it.doors != null ? [['Фасады', [['doors', 'Дверец']]]] : []),
+  ...(it.type === 'tv' ? [['Телевизор', [['panel', 'Толщина панели'], ['stand', 'Высота подставки под панелью']]]] : []),
   ...(it.type === 'portal' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки (в глубину)'], ['rail_thickness', 'Толщина рейки']]]] : []),
 ];
 
@@ -1196,12 +1451,12 @@ function renderEditor() {
     rows.forEach(([k, label]) => {
       const link = it.link[k], was = origById[it.id].link[k];     // link: the value is derived (formula / parent); was: it was in the YAML
       const num = el('input'); num.type = 'number'; num.step = 1;
-      const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' ? 1 : k === 'rotation' ? 5 : .5;   // slider and number box edit the same value
+      const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' || k === 'doors' ? 1 : k === 'rotation' ? 5 : .5;   // slider and number box edit the same value
       num.oninput = rng.oninput = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setField(it, k, v); };
       num.onchange = () => { num.value = r1(it[k]); };                // show the clamped value
       inputs[k] = { num, rng };
       num.disabled = rng.disabled = !!link;                           // derived: edit its source, or unlock it
-      const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' ? 'шт' : k === 'rotation' ? '°' : 'см'));
+      const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' || k === 'doors' ? 'шт' : k === 'rotation' ? '°' : 'см'));
       const top = el('div', 'top'); top.append(el('span', '', label));
       if (link || was) {                                              // 🔗 linked -> set by hand;  🔓 set by hand -> back to the link
         const b = el('button', 'eye', link ? '🔗' : '🔓');
@@ -1257,7 +1512,7 @@ function refresh() {
 
 function yamlText() {
   const fmt = v => typeof v === 'number' ? r1(v) : JSON.stringify(v);        // a link stays a quoted "=expression"
-  const hole = h => `${h.id}:  # стена ${h.wall}\n` + KEYS.hole.filter(k => k !== 'sill' || h.kind === 'window')
+  const hole = h => `${h.id}:  # стена ${h.wall}\n` + KEYS.hole.filter(k => h.def[k] !== undefined && (k !== 'sill' || h.kind === 'window'))
     .map(k => `  ${k === 'sill' ? 'sill_height' : k}: ${fmt(h.def[k])}`).join('\n');
   // one object block for every room; `p` = indent of the "- id" line (2 in rooms/*.yaml, 6 in apartment.yaml)
   const obj = (o, p) => {
@@ -1271,6 +1526,7 @@ function yamlText() {
       ...(o.type === 'kitchen' ? PAL.map(([c]) => f(c, `"${o[c]}"`)) : []),
       ...(isGroup(o) ? [] : [f('color', `"${o.color}"`)]),
       ...(o.kitchen ? [f('kitchen', o.kitchen)] : []), ...(o.facade_side ? [f('facade_side', o.facade_side)] : []),
+      ...(o.doors != null && o.type !== 'kitchen' ? [f('facade', `"${o.facade}"`)] : []), ...(o.valve ? [f('valve', o.valve)] : []),
       ...(o.model ? [f('model', o.model)] : []),
       ...(o.cutout ? [f('cutout', `{in: ${o.cutout.in}, width: ${o.cutout.width}, depth: ${o.cutout.depth}}`)] : [])].join('\n');
   };

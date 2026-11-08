@@ -12,6 +12,12 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
   wall_thickness: 12                      # cm, drawn outward from the room outline
   windows[]:   sill_height (cm, default 85; 0 for type door/balcony-door/sliding-door)
                height      (cm, default 145; 210 for door types)
+               drawn as a white PVC double-glazed unit: frame, glazing, sill with ears.
+               mullion  (cm from the window's start edge - the side nearer the wall's first corner - to the centre
+                        of the mullion; none = one pane)
+               opens: start | end | both | none   which pane is an opening sash (frame + sash + handle at the
+                        mullion); the others are fixed glazing (default start)
+               frame_color ("#rrggbb", default white)
   openings[]:  height      (cm, default 210)
                swing: in | out            (door leaf side, default in)
                hinge: start | end         (default start = nearer the wall's first letter)
@@ -46,7 +52,7 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       parts `lower` (height, depth, top) and `upper`; every cabinet inside inherits from its part.
                params: {level: 260}  or  {level: {value: 260, label: "..."}}   own numbers of a container
                any number may be a LINK: "=<expression>" (quote it). A bare name is a property of this very object,
-                      `id.name` is a property of another object / opening of the room: "=upper.level - elevation",
+                      `id.name` is a property of another object / opening / window of the room: "=upper.level - elevation",
                       "=lower.height + lower.top", "=portal.width + 1". Operators + - * / and (); put spaces
                       around a minus (ids contain hyphens). An inherited link is evaluated for the child.
                       Openings: only `height` may be a link (position / width are read by the rules engine).
@@ -56,6 +62,15 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
                type: table   -> a slab (`top` thick, default 4) on four square legs (`leg` section, default 5),
                       5 cm in from the edges; height = to the top surface; kitchen: true = slab in the worktop colour
+               doors: N      -> any plain box gets N equal doors on its room side in `facade` ("#rrggbb", default white),
+                      the body in `color` (a TV stand / sideboard)
+               type: tv      -> flat TV on a pedestal: width x depth (pedestal footprint) x height (overall);
+                      panel = panel thickness (default 4.6), stand = pedestal height under the panel (default 4).
+                      The screen is a real mirror (three.js Reflector): it reflects the room
+               type: radiator -> steel panel radiator: profiled front, top grille; valve: start | end = side of the
+                      thermostatic valve (default end); gap = distance from the wall (brackets)
+               type: rug     -> a flat rug (height = pile, ~1 cm) with a striped vintage pattern; the stripes run
+                      along the width; color = base colour
 
 Coordinates: origin = corner A, X = east, Y = north, cm (planhaus convention).
 
@@ -110,6 +125,7 @@ def by_id(items):
 
 REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
            "against": "wall", "group": "parent: <id of a type: group object>"}
+SHAPES = ("portal", "table", "tv", "radiator", "rug")      # objects drawn in their own way (not a plain box)
 CONTAINERS = ("group", "kitchen")                     # objects without geometry: they hold the sizes their children inherit
 NUMERIC = ("position", "gap", "elevation", "rotation", "width", "depth", "height", "top")
 
@@ -132,7 +148,7 @@ def make_object(o, wall_ids, embed_model, where):
     if bad:
         sys.exit(f"{where}[{o['id']}]: not allowed: {', '.join(bad)}. An object has wall + position + gap and "
                  f"width (along the wall) x depth (away from it) x height")
-    kind = o.get("type") if o.get("type") in ("portal", "table") + CONTAINERS else None
+    kind = o.get("type") if o.get("type") in SHAPES + CONTAINERS else None
     if kind not in CONTAINERS and o.get("wall") not in wall_ids:
         sys.stderr.write(f"{where}[{o['id']}]: wall {o.get('wall')!r} is not a wall of this room "
                          f"({', '.join(sorted(wall_ids))}), skipped\n")
@@ -157,6 +173,12 @@ def make_object(o, wall_ids, embed_model, where):
                     "rail_thickness": raw(o.get("rail_thickness"), 4)})
     elif kind == "table":
         out.update({"top": raw(o.get("top"), 4), "leg": raw(o.get("leg"), 5)})
+    elif kind == "tv":
+        out.update({"panel": raw(o.get("panel"), 4.6), "stand": raw(o.get("stand"), 4)})
+    elif kind == "radiator":
+        out["valve"] = "start" if o.get("valve") == "start" else "end"
+    if o.get("doors") is not None:
+        out.update({"doors": raw(o.get("doors"), 0), "facade": str(o.get("facade") or "#f2f0eb")})
     return out
 
 
@@ -257,7 +279,9 @@ def main():
                 "position": num(y.get("position"), 0), "width": num(o.get("width"), 0),
                 "sill": num(y.get("sill_height"), 0 if is_door else 85),
                 "height": num(y.get("height"), 210 if is_door else 145),
-                "subtype": wtype,
+                "subtype": wtype, "mullion": raw(y.get("mullion")),
+                "opens": y.get("opens") if y.get("opens") in ("start", "end", "both", "none") else "start",
+                "frame_color": y.get("frame_color") or "#f4f4f2",
             })
         elif t == "opening":
             y = y_openings.get(o["id"], {})
@@ -321,7 +345,7 @@ def main():
         return None
 
     objects = [x for x in (make_object(o, wall_ids, embed_model, "objects") for o in room.get("objects") or []) if x]
-    check_links(objects, [h for h in holes if h["kind"] == "opening"], "objects")
+    check_links(objects, holes, "objects")              # windows and openings can be linked to ("=window.position + 6")
     if room.get("kitchen_colors"):
         sys.exit("kitchen_colors: is gone - put facade / carcass / worktop on the `type: kitchen` object in objects:")
     room_id = room.get("id") or room_path.stem
