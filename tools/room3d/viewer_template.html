@@ -13,7 +13,6 @@
   #panel { left:12px; overflow:auto; }
   #side { right:12px; display:flex; flex-direction:column; gap:10px; }
   .muted, .hint { color:var(--muted); font-size:11px; }
-  #saved.ok { color:#2e8b57; } #saved.bad { color:#d33; font-weight:600; }
   h1 { font-size:15px; margin:0; }
   h2 { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 4px; }
   button { font:inherit; font-size:12px; padding:5px 10px; border-radius:6px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
@@ -26,6 +25,9 @@
   .seg { display:flex; } .seg button { flex:1; border-radius:0; margin-left:-1px; padding:5px 6px; }
   .seg button:first-child { border-radius:6px 0 0 6px; margin-left:0; } .seg button:last-child { border-radius:0 6px 6px 0; }
   .chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .rng { display:flex; align-items:center; gap:8px; }
+  .rng input { flex:1; min-width:0; margin:0; accent-color:var(--accent); }
+  .rng span { min-width:30px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
   .kcol { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; }
   .kcol label { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; color:var(--muted); cursor:pointer; }
   .kcol input[type=color] { width:100%; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; }
@@ -77,7 +79,6 @@
   .unit { position:absolute; right:7px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--muted); pointer-events:none; }
   #ehint { white-space:pre-line; margin-top:8px; }
   label.chk { display:flex; align-items:center; gap:8px; margin:8px 0; cursor:pointer; } label.chk input { accent-color:var(--accent); margin:0; }
-  #foot { display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:10px; }
   .frow { display:flex; gap:6px; } .frow button { flex:1; }
   button:disabled { opacity:.4; cursor:default; } button:disabled:hover { background:transparent; }
 
@@ -85,12 +86,18 @@
   .lbl.dim { background:rgba(61,110,140,.9); color:#fff; }
   .lbl.hole { background:rgba(120,170,210,.9); color:#fff; }
   .hide-labels .lbl { display:none; }
-  #ydlg { width:min(460px, calc(100vw - 24px)); padding:12px; border:0; border-radius:12px; background:var(--bg); color:var(--ink); box-shadow:0 4px 24px rgba(0,0,0,.35); }
-  #ydlg::backdrop { background:rgba(0,0,0,.4); }
-  #yaml { display:block; width:100%; box-sizing:border-box; height:min(420px, 65vh); padding:8px; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:6px; font:12px/1.4 ui-monospace,Consolas,monospace; }
-  #ydlg button { margin-top:8px; }
   #speed { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); padding:5px 12px; border-radius:8px; background:var(--panel); box-shadow:0 2px 10px rgba(0,0,0,.2); font-size:12px; pointer-events:none; opacity:0; transition:opacity .3s; }
   #speed.show { opacity:1; }
+
+  /* desktop: drag the bar between the tree and the inspector; each panel hides to a tab on its screen edge */
+  #split { flex:none; height:10px; margin:2px 0 -2px; cursor:row-resize; touch-action:none; display:flex; align-items:center; }
+  #split::after { content:''; flex:1; height:3px; border-radius:2px; background:var(--line); }
+  #split:hover::after, #split.drag::after { background:var(--accent); }
+  .pclose { padding:2px 8px; font-size:11px; }
+  .ptab { position:fixed; top:12px; z-index:5; padding:10px 6px; background:var(--panel); box-shadow:0 2px 10px rgba(0,0,0,.2); display:none; writing-mode:vertical-rl; }
+  #tab-panel { left:0; border-radius:0 8px 8px 0; } #tab-side { right:0; border-radius:8px 0 0 8px; }
+  body.hide-panel #panel, body.hide-side #side { display:none; }
+  body.hide-panel #tab-panel, body.hide-side #tab-side { display:block; }
 
   /* phone: the scene gets the whole screen; "Вид" / "Объекты" in a bottom bar open one panel at a time as a bottom sheet */
   #mbar { display:none; }
@@ -102,7 +109,8 @@
              max-height:min(62vh, calc(100vh - 150px)); }
     body.sheet-panel #panel { display:block; }
     body.sheet-side #side { display:flex; }
-    #treewrap { flex:none; } #tree { max-height:24vh; }      /* tree keeps its height, the editor below scrolls */
+    #split, .pclose, .ptab { display:none !important; }     /* the phone has its bottom bar instead */
+    #treewrap { flex:none; } #tree { max-height:24vh !important; }      /* tree keeps its height, the editor below scrolls */
     #insp { flex:1; min-height:0; }
     #tree summary, #tree .item { padding-top:8px; padding-bottom:8px; }
     .eye { padding:4px 8px; }
@@ -122,6 +130,7 @@
 <body>
 <div id="c"></div>
 <div id="panel" class="panel">
+  <button class="pclose" data-hide="panel" title="Скрыть панель настроек сцены" style="float:right">‹ Скрыть</button>
   <h1 id="title"></h1>
   <div class="muted" id="meta"></div>
   <div class="sec"><span class="lab">Вид</span>
@@ -131,6 +140,9 @@
     <div class="seg"><button id="bpersp">Перспектива</button><button id="bortho">Ортогональная</button></div></div>
   <div class="sec"><span class="lab">Показать</span>
     <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Показать / скрыть остальные комнаты квартиры (кухня-гостиная остаётся как есть)">Все комнаты</button></div></div>
+  <div class="sec" title="Стена прячется, пока угол между её внешней нормалью и направлением на камеру меньше этого значения. Больше — стены прячутся раньше (при повороте камеры сильнее вбок), меньше — только когда камера смотрит почти прямо на стену. 0° — срез выключен."><span class="lab">Угол среза</span>
+    <div class="rng"><input type="range" id="rcut" min="0" max="90" step="1"><span id="vcut"></span></div></div>
+  <div class="frow" style="margin-top:10px"><button id="bundo" title="Ctrl+Z">↶ Отменить</button><button id="bredo" title="Ctrl+Y / Ctrl+Shift+Z">↷ Вернуть</button></div>
   <details class="help"><summary>Управление мышью</summary>
     Вращение вокруг центра: левая кнопка / один палец. Сдвиг: средняя кнопка / два пальца. Масштаб: колесо / щипок.
     Осмотреться (повернуть голову, камера стоит на месте): правая кнопка.
@@ -142,29 +154,23 @@
     Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</details>
 </div>
 <div id="side" class="panel">
-  <div id="treewrap"><div class="thead"><h2>Помещения</h2><button id="bcollapse" title="Свернуть все помещения и папки в дереве">Свернуть все</button></div><div id="tree"></div></div>
+  <div id="treewrap"><div class="thead"><h2>Помещения</h2><span><button id="bcollapse" title="Свернуть все помещения и папки в дереве">Свернуть все</button> <button class="pclose" data-hide="side" title="Скрыть панель объектов">Скрыть ›</button></span></div><div id="tree"></div></div>
+  <div id="split" title="Потяните, чтобы изменить высоту дерева"></div>
   <div id="insp">
     <div id="empty">Выберите стену, проём или предмет в списке или кликните по нему на сцене.</div>
     <div id="editor" hidden>
       <div class="ehead"><i id="esw" class="sw"></i>
         <div><div id="etitle"></div><div class="muted" id="esub"></div></div>
-        <button id="eundo" title="Вернуть значения из YAML">↺ Из YAML</button></div>
+        <button id="eundo" title="Вернуть исходные значения">↺ Сбросить</button></div>
       <div id="fields"></div>
       <div class="hint" id="ehint"></div>
     </div>
   </div>
-  <div id="foot">
-    <div class="frow"><button id="bundo" title="Ctrl+Z">↶ Отменить</button><button id="bredo" title="Ctrl+Y / Ctrl+Shift+Z">↷ Вернуть</button></div>
-    <div class="frow"><button id="byaml">Просмотреть YAML</button></div>
-    <div class="muted" id="saved"></div>
-  </div>
 </div>
 <div id="speed"></div>
+<button class="ptab" id="tab-panel" data-hide="panel" title="Показать панель настроек сцены">Сцена ›</button>
+<button class="ptab" id="tab-side" data-hide="side" title="Показать панель объектов">‹ Объекты</button>
 <div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Помещения</button></div>
-<dialog id="ydlg">
-  <textarea id="yaml" readonly></textarea>
-  <form method="dialog"><button>Закрыть</button></form>
-</dialog>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -211,7 +217,8 @@ const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, 
 const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a container: no geometry, holds sizes and the palette
 // ONE main colour (`color`) is editable for a simple object: a plain box, a sofa / chair model, a portal, a slat wall. Not for composite
 // ones (table: legs + top, tv, radiator, rug, an object with doors) nor for kitchen cabinets (they follow the kitchen palette).
-const hasColor = it => !it.kind && !isGroup(it) && !it.kitchen && !['table', 'tv', 'radiator', 'rug'].includes(it.type) && it.doors == null;
+// A `kitchen: panel` board has its own colour too (a stand-in for a wall); without one it takes the carcass colour.
+const hasColor = it => !it.kind && !isGroup(it) && (!it.kitchen || it.kitchen === 'panel') &&!['table', 'tv', 'radiator', 'rug'].includes(it.type) && it.doors == null;
 // the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
 const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
 const palOf = o => {
@@ -313,13 +320,14 @@ R.apartment.forEach(r => { r.wallGroups = aptWallGroups(r); });
 const WALLS = [...R.walls.map(w => ({ id: 'w:' + w.id, label: 'Стена ' + w.id, w, wallOf: MAIN, color: '#f3f0ea' })), ...R.apartment.flatMap(r => r.wallGroups)];
 const wallRow = id => WALLS.find(x => x.id === id);
 const solid = new Set(ui.solid || (ui.cutaway === false ? WALLS.map(x => x.id) : []));   // ids of walls without cutaway (old global switch carried over)
+let cutDeg = clamp(+(ui.cut ?? 63), 0, 90);        // scene setting: cutaway angle, see updateWalls
 let saveTimer;
 function saveUi() {                                // debounced: camera 'change' fires on every frame
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try {
       localStorage.setItem(UKEY, JSON.stringify({
-        view, isOrtho, sel, solid: [...solid], ao, speed, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
+        view, isOrtho, sel, solid: [...solid], cut: cutDeg, ao, speed, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
         hidden: [...hid], collapsed: [...collapsed], seen: aptIds,
         cam: { p: camera.position.toArray(), t: controls.target.toArray(), z: camera.zoom },
       }));
@@ -329,7 +337,7 @@ function saveUi() {                                // debounced: camera 'change'
 
 // ---------- items: openings (windows/doors) and free boxes share one edit mechanism ----------
 // Edits are saved by tools/room3d/serve.py straight into rooms/*.yaml / apartment.yaml (see SERVER below). Without it they
-// stay in localStorage and "Просмотреть YAML" shows what to paste. A stored edit is dropped if the YAML value it was made
+// stay in localStorage. A stored edit is dropped if the YAML value it was made
 // against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill', 'mullion'],                                     // mullion: windows
@@ -392,7 +400,7 @@ try {
   });
 } catch { /* storage blocked: start from the YAML values */ }
 resolveAll();
-const setSaved = (cls, text) => { const s = btn('saved'); s.className = 'muted ' + cls; s.textContent = text; };
+const setSaved = (cls, text) => { if (cls === 'bad') console.warn(text); };      // the user is not shown any saving status
 let pushTimer, pushing = false, pushAgain = false;
 // the difference between the items now and the YAML (origById): only changed fields go to the server, so a stale tab cannot
 // overwrite what another tab or browser saved meanwhile
@@ -695,7 +703,7 @@ function build() {
       return m;
     };
     const pal = palOf(o);
-    const body = box(o.depth, o.elevation, o.height, o.kitchen ? pal.carcass : o.color);
+    const body = box(o.depth, o.elevation, o.height, o.kitchen === true ? pal.carcass : o.color || (o.kitchen && pal.carcass));
     if (o.top) box(o.depth + 2, o.elevation + o.height, o.top, pal.worktop, .3);   // countertop, 2 cm front overhang
     if (o.kitchen === true) {                        // kitchen: panel = a plain board in the carcass colour, no front
       // front panel (1.8 cm), 2 mm smaller than the body all round, so a thin carcass edge shows, 1 mm proud of it.
@@ -1323,10 +1331,10 @@ function setProj(toOrtho) {
 }
 
 const camDir = new THREE.Vector3();
-// Cutaway angle: a wall is cut away while the angle between its outward normal and the direction to the camera is below
-// acos(CUT) (CUT .45 = 63 deg; it was .2 = 78 deg, which cut walls away too early). Side-on walls stay in place.
-const CUT = .45;
+// Cutaway angle (scene setting "Угол среза", cutDeg, default 63 deg): a wall is cut away while the angle between its
+// outward normal and the direction to the camera is below it. Side-on walls stay in place; 0 deg = no cutaway.
 function updateWalls() {
+  const CUT = Math.cos(cutDeg * Math.PI / 180);
   camDir.subVectors(camera.position, controls.target).normalize();
   // ceilings: cut away as soon as the camera is higher than the ceiling
   const above = camera.position.y > R.ceiling * S;
@@ -1358,6 +1366,8 @@ btn('bpersp').onclick = () => setProj(false);
 btn('bortho').onclick = () => setProj(true);
 btn('blabels').onclick = e => { const on = document.body.classList.toggle('hide-labels'); e.target.classList.toggle('on', !on); saveUi(); };
 btn('bao').onclick = e => { ao = !ao; e.target.classList.toggle('on', ao); saveUi(); };
+btn('rcut').value = cutDeg; btn('vcut').textContent = cutDeg + '°';
+btn('rcut').oninput = e => { cutDeg = +e.target.value; btn('vcut').textContent = cutDeg + '°'; saveUi(); };   // updateWalls runs every frame
 btn('bzones').onclick = e => { zoneGroup.visible = !zoneGroup.visible; e.target.classList.toggle('on', zoneGroup.visible); saveUi(); };
 // the whole flat at once: hides everything if anything of it is shown, otherwise shows all of it and frames it
 btn('bapt').hidden = !R.apartment.length;
@@ -1372,7 +1382,7 @@ const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke=
 const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18 18 0 0 1 5.1-5.9M9.9 4.2A10.7 10.7 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.2 3.2M1 1l22 22"/></svg>';
 const swatch = it => {
   const p = it.room && !it.kind ? palOf(it) : {};
-  return (it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
+  return (it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? it.color || p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
     || it.color || models[it.model]?.base || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
 };
 let inputs = {}, cinputs = {};
@@ -1407,6 +1417,26 @@ function sheet(name, open) {                       // open: true / false, or und
   document.querySelectorAll('#mbar button').forEach(b => b.classList.toggle('on', b.dataset.sheet === next));
 }
 document.querySelectorAll('#mbar button').forEach(b => b.onclick = () => sheet(b.dataset.sheet));
+
+// ---------- desktop: tree height (drag the bar) and hidden panels, remembered per browser ----------
+const LKEY = 'planner:layout';
+let lay = {};
+try { lay = JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch { /* defaults */ }
+const saveLay = () => { try { localStorage.setItem(LKEY, JSON.stringify(lay)); } catch { /* not persisted */ } };
+const treeEl = document.getElementById('tree');
+const setTreeH = h => { treeEl.style.maxHeight = clamp(h, 60, innerHeight - 220) + 'px'; };   // 220: room left for the inspector and footer
+if (lay.treeH) setTreeH(lay.treeH);
+const split = document.getElementById('split');
+split.onpointerdown = e => {
+  const y0 = e.clientY, h0 = treeEl.getBoundingClientRect().height;
+  split.setPointerCapture(e.pointerId); split.classList.add('drag');
+  split.onpointermove = m => setTreeH(h0 + m.clientY - y0);
+  split.onpointerup = () => { split.classList.remove('drag'); split.onpointermove = split.onpointerup = null; lay.treeH = parseFloat(treeEl.style.maxHeight); saveLay(); };
+};
+['panel', 'side'].forEach(n => document.body.classList.toggle('hide-' + n, !!lay['hide_' + n]));
+document.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
+  lay['hide_' + b.dataset.hide] = document.body.classList.toggle('hide-' + b.dataset.hide); saveLay();
+});
 
 // Every room is the same tree node: its eye hides the whole room (floor, walls, objects); inside it the same folders -
 // «Стены» (floor + walls: scissors = cutaway, eye = floor and walls only), «Проёмы» (windows / doors cut in its walls),
@@ -1587,34 +1617,7 @@ function refresh() {
       + (Object.keys(it.link).some(k => it.link[k]) ? '\n🔗 — значение выведено из формулы или родителя; замок переключает на ручное.' : '')
       + (it.err ? `\n⚠ ${it.err}` : '');
   }
-  btn('yaml').value = yamlText();
   syncGizmo();
-}
-
-function yamlText() {
-  const fmt = v => typeof v === 'number' ? r1(v) : JSON.stringify(v);        // a link stays a quoted "=expression"
-  const hole = h => `${h.id}:  # стена ${h.wall}\n` + KEYS.hole.filter(k => h.def[k] !== undefined && (k !== 'sill' || h.kind === 'window'))
-    .map(k => `  ${k === 'sill' ? 'sill_height' : k}: ${fmt(h.def[k])}`).join('\n');
-  // one object block for every room; `p` = indent of the "- id" line (2 in rooms/*.yaml, 6 in apartment.yaml)
-  const obj = (o, p) => {
-    const f = (k, v) => `${p}  ${k}: ${v}`, ps = Object.keys(o.params || {});
-    return [`${p}- id: ${o.id}`, f('label', JSON.stringify(o.label)), ...(o.type ? [f('type', o.type)] : []),
-      ...(o.parent ? [f('parent', o.parent)] : []), ...(o.wall ? [f('wall', o.wall)] : []),
-      ...KEYS.object.filter(k => o.def[k] !== undefined && !(['gap', 'elevation'].includes(k) && o.def[k] === 0 && !o.parent)   // zero gap/elevation are defaults
-        && !(k === 'rotation' && !o.def[k]))                                                                                     // so is zero rotation
-        .map(k => f(k, fmt(o.def[k]))),
-      ...(ps.length ? [f('params', `{${ps.map(n => `${n}: {value: ${fmt(o.def[n])}, label: ${JSON.stringify(o.params[n].label)}}`).join(', ')}}`)] : []),
-      ...(o.type === 'kitchen' ? PAL.map(([c]) => f(c, `"${o[c]}"`)) : []),
-      ...(isGroup(o) || !o.color ? [] : [f('color', `"${o.color}"`)]),
-      ...(o.kitchen ? [f('kitchen', o.kitchen)] : []), ...(o.facade_side ? [f('facade_side', o.facade_side)] : []),
-      ...(o.doors != null && o.type !== 'kitchen' ? [f('facade', `"${o.facade}"`)] : []), ...(o.valve ? [f('valve', o.valve)] : []),
-      ...(o.model ? [f('model', o.model)] : []),
-      ...(o.cutout ? [f('cutout', `{in: ${o.cutout.in}, width: ${o.cutout.width}, depth: ${o.cutout.depth}}`)] : [])].join('\n');
-  };
-  return `# окна и проёмы: обновить поля в windows: / openings: файла rooms/*.yaml (sill → sill_height)\n${R.holes.map(hole).join('\n')}`
-    + `\n\n# ${MAIN.name} (rooms/${MAIN.id}.yaml): заменить блок objects: целиком\nobjects:\n${MAIN.objects.map(o => obj(o, '  ')).join('\n')}`
-    + R.apartment.filter(r => r.objects.length).map(r => `\n\n# ${r.name} (apartment.yaml, комната ${r.id}): заменить objects: целиком\n    objects:\n`
-      + r.objects.map(o => obj(o, '      ')).join('\n')).join('');
 }
 
 function resetItems(items) {
@@ -1623,7 +1626,6 @@ function resetItems(items) {
   resolveAll(); saveEdits(); build(); renderTree(); renderEditor(); refresh();
 }
 btn('eundo').onclick = () => resetItems([byId(sel)]);
-btn('byaml').onclick = () => btn('ydlg').showModal();
 
 // ---------- gizmo on the selected item, like in any 3D editor: move -> rotate -> off, one step per click on it ----------
 // three.js TransformControls drives an invisible proxy placed at the centre of the item's box (gizmoMode 1 = translate,
@@ -1751,7 +1753,6 @@ function revealSel() {
   tree.scrollTo({ top: tree.scrollTop + rr.top - tr.top - (tree.clientHeight - rr.height) / 2, behavior: 'smooth' });
 }
 addEventListener('keydown', e => {
-  if (btn('ydlg').open) return;
   if (e.key === 'Escape') return select(null);
   if (!(e.ctrlKey || e.metaKey) || (e.code !== 'KeyZ' && e.code !== 'KeyY')) return;   // e.code: works on any keyboard layout
   e.preventDefault();                                                                  // instead of the browser's own text undo
@@ -1763,7 +1764,7 @@ const held = new Set();
 let speed = clamp(+ui.speed || 1, .05, 20), speedTimer;                         // m/s
 const typing = () => document.activeElement?.matches('input, textarea, select');
 addEventListener('keydown', e => {
-  if (btn('ydlg').open || e.ctrlKey || e.metaKey || e.altKey || typing()) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || typing()) return;
   if (FLY[e.code]) { held.add(e.code); e.preventDefault(); return; }
   const k = { Minus: 1 / 1.5, NumpadSubtract: 1 / 1.5, Equal: 1.5, NumpadAdd: 1.5 }[e.code];
   if (!k) return;

@@ -98,7 +98,7 @@ objects:
   - id: kitchen
     label: "Кухня"
     type: kitchen
-    facade: "#d49b16"
+    facade: "#241000"
     carcass: "#654a29"
     worktop: "#6b6259"
   - id: lower
@@ -134,7 +134,6 @@ objects:
     width: 56
     depth: 52
     height: 62.5
-    color: "#303030"
     model: assets/models/hansgrohe-c51-f450-01.glb
     cutout: {in: e-base, width: 53, depth: 49}
   - id: e-upper
@@ -165,7 +164,6 @@ objects:
     width: 59.5
     depth: 67.2
     height: 184.5
-    color: "#c9ccce"
     model: assets/models/aeg-fridge-freezer-bottom-silver.glb
   - id: fridge-top
     label: "Шкаф над холодильником"
@@ -193,13 +191,14 @@ objects:
     wall: B-C
     position: "=door-1.position"
     width: "=door-1.width"
-    height: 210                        # the one number: door-1, the arch, the panel and the shelf over it follow
+    height: 270                        # the one number: door-1, the arch, the panel and the shelf over it follow
     gap: -12
     depth: 76
     rails: 8
     rail_width: 5
     rail_thickness: 1
     color: "#b08b5e"
+    rotation: 0
   - id: n-base
     label: "Нижние шкафы (C-D)"
     parent: lower
@@ -212,7 +211,7 @@ objects:
     label: "Варочная панель"
     parent: kitchen
     wall: C-D
-    position: 110
+    position: 85.5
     gap: 4.1
     elevation: "=lower.height + lower.top"      # lies on the worktop
     width: 60
@@ -239,30 +238,29 @@ objects:
     leg: 5
     color: "#1e1e1e"
     kitchen: true
-  # COR Jalis 522 counter stools (seat ~65 cm), from Maxim's Jalis.zip; standing on the living-room side,
-  # facing the table (east), seat front 10 cm under the table edge.
+  # Rio chairs (Configura OBJ from Maxim's sources/Rio.obj, 2026-11-08) instead of the COR Jalis counter stools: same places
+  # (centres kept), living-room side, facing the table (east). 50.4 x 50.8 x 80, seat ~43 cm. The colours are guessed from the
+  # material names (CET light / dark dull blue, black): the .mtl is missing.
   - id: stool-1
-    label: "Полубарный стул COR Jalis 522 (1)"
+    label: "Стул Rio (1)"
     parent: bar-set
     wall: D-A
-    position: 77
-    gap: 272.5
-    width: 45.2
-    depth: 49
-    height: 89.9
-    color: "#6e655c"
-    model: assets/models/cor-jalis-522-counter-stool.glb
+    position: 74.4
+    gap: 271.6
+    width: 50.4
+    depth: 50.8
+    height: 80
+    model: assets/models/rio-chair.glb
   - id: stool-2
-    label: "Полубарный стул COR Jalis 522 (2)"
+    label: "Стул Rio (2)"
     parent: bar-set
     wall: D-A
-    position: 152
-    gap: 274.5
-    width: 45.2
-    depth: 49
-    height: 89.9
-    color: "#6e655c"
-    model: assets/models/cor-jalis-522-counter-stool.glb
+    position: 149.4
+    gap: 273.6
+    width: 50.4
+    depth: 50.8
+    height: 80
+    model: assets/models/rio-chair.glb
 
   # Sofa couch_015 from Maxim's sources/couch_015.max (2026-11-08). Moved to wall C-D, its end at the window wall,
   # as on Maxim's photo (sofa to the right of the window); the TV stands opposite, on A-B.
@@ -273,7 +271,6 @@ objects:
     width: 235.6
     depth: 83.5
     height: 50.4
-    color: "#8a8f98"
     model: assets/models/couch-015.glb
 
   # Radiator under the window (Maxim's photo, 2026-11-08): steel panel type 22, profiled front, thermostatic valve on the
@@ -328,12 +325,28 @@ objects:
     label: "Ковёр"
     type: rug
     wall: A-B
-    position: 24
+    position: 24.5
     gap: 50
-    width: 160
-    depth: 230
+    width: 215
+    depth: 165.5
     height: 1
     color: "#cdc9c2"
+
+  # Slat partition between the kitchen and the living part (Maxim, 2026-11-08): same rails as the portal, floor to ceiling.
+  # Runs N-S from the north wall C-D (position 0 = corner D); 266 cm from the west wall D-A = just behind the stools (back at 272.5),
+  # 212 cm long, so 94 cm stay free to wall A-B (the route from door-1). Count / width / thickness are editable in the viewer.
+  - id: slat-wall
+    label: "Перегородка из реек"
+    type: slats
+    wall: D-A
+    position: 34
+    gap: 266
+    width: 44.5
+    depth: 5
+    height: 270
+    rails: 7
+    rail_width: 3
+    color: "#b08b5e"
 
 zones: []
 focal_point:
@@ -376,4 +389,11 @@ notes: |
   2026-11-08: from Maxim's photos: window drawn as a PVC double-glazed unit (mullion, opening sash at D, fixed pane at A);
     radiator under it; TV set on A-B (cabinet 180 x 40 x 64 with 3 doors + LG OLED 65" with a mirror-like screen); rug
     160 x 230 between TV and sofa; sofa moved to C-D at the window wall (as on the photo). All sizes estimated from the photos.
+  2026-11-08: slat partition 'slat-wall' (type: slats, 18 slats 3 x 5 cm, 212 long, 270 high) between the kitchen and the living
+    part: from wall C-D southwards at x = 266 (behind the stools, 13 cm east of the sofa end), 94 cm left to wall A-B.
+  2026-11-08: ceilings in the viewer (every room; hidden while the camera is above them); wall cutaway angle 78 -> 63 deg (CUT .45).
+  2026-11-08: the 2 COR Jalis counter stools removed (file deleted); 2 Rio chairs (sources/Rio.obj, 50.4 x 50.8 x 80) on their
+    places, same centres.
+  2026-11-08: viewer: one editable main colour `color` for simple objects (not for the table, tv, radiator, rug, doors, kitchen cabinets);
+    models (sink, fridge, sofa, Rio chairs) lost their `color:` line - without it they show their own colours.
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).
