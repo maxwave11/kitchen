@@ -260,6 +260,17 @@ objects:
     color: "#6e655c"
     model: assets/models/cor-jalis-522-counter-stool.glb
 
+  # Sofa couch_015 from Maxim's sources/couch_015.max (2026-11-08): back to the long wall A-B, faces north.
+  - id: sofa
+    label: "Диван couch_015"
+    wall: A-B
+    position: 0
+    width: 235.6
+    depth: 83.5
+    height: 50.4
+    color: "#8a8f98"
+    model: assets/models/couch-015.glb
+
 zones: []
 focal_point:
 circulation: []
@@ -295,4 +306,7 @@ notes: |
     e-upper was 99.5 high (top 259.5), now follows upper.level = 260 (+0.5 cm).
   2026-11-08: bar table re-saved from the 3D viewer: 70 x 150, top at 78 (a normal table height, no longer flush with the
     worktop - so no link to lower.height), 170 cm from corner C; stools moved back to 272.5 / 274.5 cm from wall D-A.
+  2026-11-08: sofa 'couch_015' (235.6 x 83.5 x 50.4, grey fabric) from Maxim's sources/couch_015.max (assets/models/couch-015.glb;
+    first tried 'Waw' .3ds sofa - removed, Maxim did not like it). Back to wall A-B from corner A, faces north; units guessed as
+    inches (height 50 cm is low for a sofa - ask Maxim for the real size), the exact place is not decided.
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).
