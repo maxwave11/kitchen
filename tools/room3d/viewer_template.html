@@ -13,6 +13,7 @@
   #panel { left:12px; overflow:auto; }
   #side { right:12px; display:flex; flex-direction:column; gap:10px; }
   .muted, .hint { color:var(--muted); font-size:11px; }
+  #saved.ok { color:#2e8b57; } #saved.bad { color:#d33; font-weight:600; }
   h1 { font-size:15px; margin:0; }
   h2 { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 4px; }
   button { font:inherit; font-size:12px; padding:5px 10px; border-radius:6px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
@@ -151,6 +152,7 @@
   <div id="foot">
     <div class="frow"><button id="bundo" title="Ctrl+Z">↶ Отменить</button><button id="bredo" title="Ctrl+Y / Ctrl+Shift+Z">↷ Вернуть</button></div>
     <div class="frow"><button id="byaml">Просмотреть YAML</button></div>
+    <div class="muted" id="saved"></div>
   </div>
 </div>
 <div id="speed"></div>
@@ -319,8 +321,9 @@ function saveUi() {                                // debounced: camera 'change'
 }
 
 // ---------- items: openings (windows/doors) and free boxes share one edit mechanism ----------
-// shortcut: no backend, so edits never reach rooms/*.yaml by themselves; "Просмотреть YAML" shows what to paste.
-// An edit is dropped if the YAML value it was made against has changed since (YAML wins).
+// Edits are saved by tools/room3d/serve.py straight into rooms/*.yaml / apartment.yaml (see SERVER below). Without it they
+// stay in localStorage and "Просмотреть YAML" shows what to paste. A stored edit is dropped if the YAML value it was made
+// against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill'],
   object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'] };   // rails*: type portal, leg: type table
@@ -371,6 +374,9 @@ resolveAll();
 const pick = it => structuredClone(it.def);
 const origById = Object.fromEntries(all().map(i => [i.id, structuredClone(i)]));
 const KEY = 'planner:' + R.name;
+// With tools/room3d/serve.py running, every edit is written into the YAML by the server (the YAML is the one truth, the same
+// in every browser). Without it (file://, a plain static server) edits stay in this browser's localStorage, as before.
+const SERVER = await fetch('api/ping', { cache: 'no-store' }).then(r => r.ok, () => false);
 try {
   Object.entries(JSON.parse(localStorage.getItem(KEY) || '{}')).forEach(([id, rec]) => {
     const it = byId(id);
@@ -378,10 +384,56 @@ try {
   });
 } catch { /* storage blocked: start from the YAML values */ }
 resolveAll();
+const setSaved = (cls, text) => { const s = btn('saved'); s.className = 'muted ' + cls; s.textContent = text; };
+let pushTimer, pushing = false, pushAgain = false;
+// the difference between the items now and the YAML (origById): only changed fields go to the server, so a stale tab cannot
+// overwrite what another tab or browser saved meanwhile
+function pendingChanges() {
+  return all().flatMap(i => {
+    const o = origById[i.id].def, set = {}, del = [];
+    keysOf(i).forEach(k => {
+      if (JSON.stringify(i.def[k]) === JSON.stringify(o[k])) return;
+      if (i.def[k] === undefined) del.push(k); else set[k] = i.def[k];
+    });
+    return Object.keys(set).length || del.length ? [{ room: i.room, kind: i.kind || 'object', id: i.id, set, del }] : [];
+  });
+}
+async function pushEdits(keepalive = false) {
+  clearTimeout(pushTimer);
+  if (pushing) { pushAgain = true; return; }
+  const changes = pendingChanges();
+  if (!changes.length) { setSaved('ok', '✓ Всё сохранено в YAML'); return; }
+  pushing = true; setSaved('', 'Сохраняю в YAML…');
+  const sent = new Map(changes.map(c => [c.id, { def: pick(byId(c.id)), link: structuredClone(byId(c.id).link) }]));
+  try {
+    const r = await fetch('api/save', { method: 'POST', keepalive, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ room: MAIN.id, changes }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw Error(j.error || r.status);
+    sent.forEach((s, id) => { origById[id].def = s.def; origById[id].link = s.link; });      // the YAML now says this
+    setSaved('ok', '✓ Сохранено в YAML');
+    refresh();
+  } catch (e) {
+    setSaved('bad', '⚠ Не сохранено: ' + e.message + ' (повторю)');
+    pushTimer = setTimeout(pushEdits, 4000);
+  } finally {
+    pushing = false;
+    if (pushAgain) { pushAgain = false; pushEdits(); }
+  }
+}
 const saveEdits = () => {
+  if (SERVER) { setSaved('', 'Есть несохранённые правки…'); clearTimeout(pushTimer); pushTimer = setTimeout(pushEdits, 500); return; }
   try { localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(all().map(i => [i.id, { v: pick(i), b: pick(origById[i.id]) }])))); }
   catch { /* not persisted */ }
 };
+if (SERVER) {
+  setSaved('ok', '✓ Правки сохраняются в YAML на сервере');
+  pushEdits();                                     // edits this browser kept in localStorage before the server existed
+  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  addEventListener('pagehide', () => { if (pendingChanges().length) pushEdits(true); });
+} else {
+  setSaved('', 'Сервер не запущен: правки только в этом браузере');
+}
 
 // Everything stands on a wall: `position`/`width` run along it, `gap`+`depth` go from it into the room, so a
 // change of any size can never detach an item from its wall. Limits are shared with the sliders (rangeOf).

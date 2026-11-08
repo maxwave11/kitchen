@@ -47,7 +47,8 @@
    `color` — основной цвет модели (для рамки и дерева), `parent:` — группа, если предмет входит в набор/кухню. Приписать строку в `notes:` с датой и откуда файл.
 6. **Сборка и проверка:** `py -3.11 tools/planhaus/scripts/room_spatial.py rooms/kitchen-living.yaml --check`, затем
    `py -3.11 tools/room3d/build_room_3d.py rooms/kitchen-living.yaml -o viewer/kitchen-living.html`; открыть
-   `http://localhost:8765/kitchen-living.html` (`preview_start {url}`, перед этим `localStorage.clear()`), посмотреть скриншот: модель на месте,
+   `http://localhost:8765/kitchen-living.html` (`preview_start {name: "planner"}` — это `tools/room3d/serve.py`: он сам пересобирает HTML
+   и **сохраняет правки из вьюера прямо в YAML**, поэтому тестовые правки в нём меняют `rooms/*.yaml`; перед этим `localStorage.clear()`), посмотреть скриншот: модель на месте,
    лицом в комнату, нет ошибок в консоли.
 7. **Размер.** GLB целиком кодируется в HTML (+~1.35× размера файла). Модель на 200k треугольников = 5 МБ → HTML 8,6 МБ (был такой диван Waw, Максим его убрал): тяжелее одной-двух таких моделей
    не добавлять без прореживания сетки. Диван `couch_015` — 32k треугольников, ~1 МБ.
