@@ -763,11 +763,16 @@ function addLabel(text, pos, cls, parent = scene) { const l = makeLabel(text, cl
 // ---------- ambient occlusion (GTAO) ----------
 // shortcut: full-resolution GTAO is heavy on weak GPUs / phones; the "Затенение (AO)" toggle bypasses the composer.
 let ao = ui.ao ?? !matchMedia('(max-width: 700px)').matches;   // AO is heavy for phones: off there unless turned on
-const composer = new EffectComposer(renderer);
+// The composer's own buffers are not multisampled (antialias: true reaches only the canvas), so without this
+// target the AO view loses antialiasing and edges get jagged. resize() sizes it (pixel ratio included).
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 }));
 const renderPass = new RenderPass(scene, camera);
 const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
-gtao.updateGtaoMaterial({ radius: .35, distanceExponent: 1, thickness: 1, scale: 1.3 });        // metres
-gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 2, samples: 16 });
+// soft contact shadow: radius in metres, samples bunched toward the point, no extra contrast, 85 % strength
+// (was radius .35 / scale 1.3 / full strength: a wide halo, up to 95 % dark in corners; now ~half as wide, ≤ 70 %)
+gtao.updateGtaoMaterial({ radius: .25, distanceExponent: 1.3, thickness: 1, scale: 1 });
+gtao.blendIntensity = .85;
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
 composer.addPass(renderPass); composer.addPass(gtao); composer.addPass(new OutputPass());
 
 // ---------- camera modes ----------
