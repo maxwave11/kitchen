@@ -30,6 +30,9 @@
   .kcol label { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; color:var(--muted); cursor:pointer; }
   .kcol input[type=color] { width:100%; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; }
   .kcol input.mod { border-color:var(--mod); }
+  .ocol { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); cursor:pointer; }
+  .ocol input[type=color] { width:44px; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; flex:none; }
+  .ocol input.mod { border-color:var(--mod); }
   details.help { margin-top:10px; font-size:11px; color:var(--muted); } details.help summary { cursor:pointer; }
 
   /* right panel: outliner */
@@ -129,7 +132,8 @@
   <div class="sec"><span class="lab">Показать</span>
     <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Показать / скрыть остальные комнаты квартиры (кухня-гостиная остаётся как есть)">Все комнаты</button></div></div>
   <details class="help"><summary>Управление мышью</summary>
-    Вращение: левая кнопка / один палец. Сдвиг: правая кнопка / два пальца. Масштаб: колесо / щипок.
+    Вращение вокруг центра: левая кнопка / один палец. Сдвиг: средняя кнопка / два пальца. Масштаб: колесо / щипок.
+    Осмотреться (повернуть голову, камера стоит на месте): правая кнопка.
     Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
     Перемещение: клик по предмету выбирает его и показывает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
     квадраты между стрелками двигают сразу по двум осям. Шаг 0,5 см, границы те же, что у ползунков, Ctrl+Z отменяет.<br>
@@ -205,6 +209,9 @@ const edgeOf = it => roomById(it.room).edges.find(e => e.id === it.wall);
 const INHERIT = ['height', 'depth', 'elevation', 'gap', 'top'];
 const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, gap: 0, rotation: 0 };
 const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a container: no geometry, holds sizes and the palette
+// ONE main colour (`color`) is editable for a simple object: a plain box, a sofa / chair model, a portal, a slat wall. Not for composite
+// ones (table: legs + top, tv, radiator, rug, an object with doors) nor for kitchen cabinets (they follow the kitchen palette).
+const hasColor = it => !it.kind && !isGroup(it) && !it.kitchen && !['table', 'tv', 'radiator', 'rug'].includes(it.type) && it.doors == null;
 // the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
 const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
 const palOf = o => {
@@ -327,12 +334,12 @@ function saveUi() {                                // debounced: camera 'change'
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill', 'mullion'],                                     // mullion: windows
   object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg',
-           'doors', 'panel', 'stand'] };   // rails*: type portal, leg: type table, doors: any box, panel / stand: type tv
+           'doors', 'panel', 'stand'] };   // rails*: type portal / slats, leg: type table, doors: any box, panel / stand: type tv
 const kindOf = it => it.kind ? 'hole' : 'object';
 const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
 const underSel = o => { for (let x = o; x; x = x.parent && byId(x.parent)) if (x.id === sel) return true; return false; };   // the selected item or a container above it
-const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...Object.keys(it.params || {})];
+const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...(hasColor(it) ? ['color'] : []), ...Object.keys(it.params || {})];
 all().forEach(it => {
   it.def = {};
   keysOf(it).forEach(k => { const v = it.params?.[k] ? it.params[k].value : it[k]; if (v != null) it.def[k] = v; });
@@ -450,7 +457,7 @@ const rangeOf = (it, k) => {
     sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap],
     rotation: [0, 359],                                       // degrees clockwise seen from above, about the centre of the box
     gap: [-(it.depth + 40), perp - it.depth], top: [0, 10],   // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
-    rails: [1, 40], rail_width: [.5, it.depth / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
+    rails: [1, 80], rail_width: [.5, (it.type === 'slats' ? it.width : it.depth) / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
     leg: [1, Math.min(it.width, it.depth) / 2],
     mullion: [10, it.width - 10], doors: [0, 12], panel: [.5, it.depth], stand: [0, it.height - 10],
   })[k];
@@ -537,6 +544,16 @@ const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape),
   new THREE.MeshStandardMaterial({ map: plank, roughness: .5 }));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
 scene.add(floor);
+// ceilings: the same outline as the floor at the ceiling height, drawn from below only (BackSide) and without casting shadows
+// (the sun must still light the room). They disappear while the camera is above them (updateWalls).
+const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf6f3ee, roughness: .95, side: THREE.BackSide, emissive: 0xf6f3ee, emissiveIntensity: .3 });   // a little emissive: the underside gets no sun
+const makeCeiling = shape => {
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), ceilMat);
+  m.rotation.x = -Math.PI / 2; m.position.y = R.ceiling * S; m.receiveShadow = true;
+  return m;
+};
+const ceiling = makeCeiling(floorShape); scene.add(ceiling);
+const aptCeilings = [];
 
 const T = R.thickness, H = R.ceiling;
 const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xf3f0ea, roughness: .95 });
@@ -547,7 +564,7 @@ function clearRoot() {
   root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
   reflectors.splice(0).forEach(m => m.rt.dispose());                                   // TV mirrors: their render targets
   root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); [o.material].flat().forEach(m => m?.dispose()); } });   // model meshes are reused
-  root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0;
+  root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0; aptCeilings.length = 0;
 }
 
 function boxBetween(u0, u1, z0, z1, w, mat) {
@@ -638,6 +655,7 @@ function build() {
   const placeObject = (room, o, w) => {
     const picked = underSel(o);
     if (o.type === 'portal') return placePortal(o, w, picked);
+    if (o.type === 'slats') return placeSlats(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
     if (o.type === 'tv') return placeTv(o, w, picked);
     if (o.type === 'radiator') return placeRadiator(o, w, picked);
@@ -823,6 +841,7 @@ function buildRoomShell(r) {
     const fl = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))),
       new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
     fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
+    const ce = makeCeiling(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))); root.add(ce); aptCeilings.push(ce);
     const wm = wallMat();
     const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
     // one wall = several boxes with one id and one centre: selected, outlined and cut away together
@@ -849,13 +868,37 @@ Object.entries(R.models).forEach(([path, uri]) => gltfLoader.load(uri, g => {
   s.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(s);
   s.traverse(m => { m.userData.shared = true; if (m.isMesh) m.castShadow = m.receiveShadow = true; });
-  models[path] = { scene: s, size: bb.getSize(new THREE.Vector3()), center: bb.getCenter(new THREE.Vector3()) };
-  build();
+  // the model's own main colour = its material with the most triangles (what `color` of the object recolours)
+  const tris = new Map();
+  s.traverse(m => { if (m.isMesh) tris.set(m.material, (tris.get(m.material) || 0) + (m.geometry.index?.count ?? m.geometry.attributes.position.count)); });
+  const dom = [...tris].sort((a, b) => b[1] - a[1])[0]?.[0];
+  models[path] = { scene: s, size: bb.getSize(new THREE.Vector3()), center: bb.getCenter(new THREE.Vector3()),
+                   dom, base: dom ? '#' + dom.color.getHexString() : '#c9b8a6' };
+  build(); renderTree(); renderEditor();
 }, undefined, e => console.error('model ' + path, e)));
 
+// Recolour a model to the object's main colour: its main material gets exactly that colour, the others keep their relation to it
+// (same hue, lightness scaled by the same ratio), so a lighter seat stays lighter. Black parts, metal and glass are left alone.
+const tinted = new Map();
+function tintMaterial(M, mat, hex) {
+  const key = M.dom.uuid + '|' + mat.uuid + '|' + hex;
+  if (tinted.has(key)) return tinted.get(key);
+  const hsl = c => c.getHSL({}, THREE.SRGBColorSpace);
+  const D = hsl(M.dom.color), T = hsl(new THREE.Color(hex)), m = hsl(mat.color);
+  let out = mat;
+  if (mat === M.dom) { out = mat.clone(); out.color.set(hex); }
+  else if (!(mat.metalness > .5 || mat.opacity < 1 || m.l < .12)) {
+    const l = clamp(m.l * clamp(T.l / Math.max(D.l, .05), .25, 4), 0, 1);
+    const grey = T.s <= .04, s = grey ? clamp(m.s * T.s / Math.max(D.s, .05), 0, 1) : clamp(T.s * (D.s > .08 ? m.s / D.s : 1), 0, 1);
+    out = mat.clone(); out.color.setHSL(grey ? m.h : T.h, s, l, THREE.SRGBColorSpace);
+  }
+  tinted.set(key, out);
+  return out;
+}
 function placeModel(o, w, picked) {
   const M = models[o.model];
   const inner = M.scene.clone(true);                 // shares geometry and materials with the loaded model
+  if (o.def?.color && M.dom && o.def.color.toLowerCase() !== M.base) inner.traverse(m => { if (m.isMesh) m.material = tintMaterial(M, m.material, o.def.color); });
   inner.position.copy(M.center).negate();
   inner.traverse(m => { if (m.isMesh) { m.userData.id = o.id; pickables.push(m); } });
   const fit = new THREE.Group();
@@ -910,6 +953,27 @@ function placePortal(o, w, picked) {
     piece(u0, u0 + th, t0, z0, z1 - th);            // leg at the wall's start corner side
     piece(u1 - th, u1, t0, z0, z1 - th);            // the other leg
     piece(u0, u1, t0, z1 - th, z1);                 // top bar
+  }
+  if (picked) selectionBox(o, w);
+}
+// ---------- slats: a wall of identical vertical slats spread over the width (type: slats) ----------
+// Slat i stands at position + i*step along the wall; the first starts at `position`, the last ends at position + width.
+// rail_width = one slat along the wall, depth = slat thickness, height = from `elevation` (a partition up to the ceiling).
+function placeSlats(o, w, picked) {
+  const n = Math.max(1, Math.round(o.rails)), rw = Math.min(o.rail_width, o.width / n);
+  const step = n > 1 ? (o.width - rw) / (n - 1) : 0;
+  const g = new THREE.BoxGeometry(rw * S, o.height * S, o.depth * S);
+  const mat = new THREE.MeshStandardMaterial({ color: o.color, roughness: .55 });
+  const line = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .25 });
+  const edges = new THREE.EdgesGeometry(g), t = o.gap + o.depth / 2;
+  for (let i = 0; i < n; i++) {
+    const u = o.position + rw / 2 + i * step;
+    const m = new THREE.Mesh(g, mat);
+    m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
+    m.rotation.y = Math.atan2(w.dy, w.dx);
+    m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
+    m.add(new THREE.LineSegments(edges, line));
+    root.add(m); pickables.push(m);
   }
   if (picked) selectionBox(o, w);
 }
@@ -1259,22 +1323,29 @@ function setProj(toOrtho) {
 }
 
 const camDir = new THREE.Vector3();
+// Cutaway angle: a wall is cut away while the angle between its outward normal and the direction to the camera is below
+// acos(CUT) (CUT .45 = 63 deg; it was .2 = 78 deg, which cut walls away too early). Side-on walls stay in place.
+const CUT = .45;
 function updateWalls() {
   camDir.subVectors(camera.position, controls.target).normalize();
+  // ceilings: cut away as soon as the camera is higher than the ceiling
+  const above = camera.position.y > R.ceiling * S;
+  ceiling.visible = !above && !hid.has(shellId(MAIN));
+  aptCeilings.forEach(m => { m.visible = !above; });
   wallGroups.forEach(g => {
     const { w, wid, labels } = g.userData;
     // a wall between the camera and the room disappears with its window/door and labels; outward normal in three coords: (nx, 0, -ny).
-    // The 0.2 margin keeps side-on walls (e.g. in the top view) in place.
-    g.visible = !(!solid.has(wid) && w.nx * camDir.x - w.ny * camDir.z > .2);
+    // The CUT margin (below) keeps side-on walls (e.g. in the top view) in place.
+    g.visible = !(!solid.has(wid) && w.nx * camDir.x - w.ny * camDir.z > CUT);
     labels.forEach(l => { l.visible = g.visible; });
   });
   // apartment walls, same rule as the kitchen's: a wall is cut away while the camera sees it from outside, i.e. it stands
-  // between the orbit target and the camera (across its thin axis) and the camera is not side-on to it (same 0.2 margin)
+  // between the orbit target and the camera (across its thin axis) and the camera is not side-on to it (same CUT margin)
   const dx = camDir.x, dy = -camDir.z;                         // camera direction in plan coords
   const tx = controls.target.x / S, ty = -controls.target.z / S;
   aptWalls.forEach(m => {
     const { id, c, ax } = m.userData, d = ax === 'x' ? dx : dy, off = ax === 'x' ? c[0] - tx : c[1] - ty;
-    m.visible = solid.has(id) || !(Math.abs(d) > .2 && off * d > 0);
+    m.visible = solid.has(id) || !(Math.abs(d) > CUT && off * d > 0);
   });
 }
 
@@ -1302,7 +1373,7 @@ const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" str
 const swatch = it => {
   const p = it.room && !it.kind ? palOf(it) : {};
   return (it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
-    || it.color || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
+    || it.color || models[it.model]?.base || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
 };
 let inputs = {}, cinputs = {};
 
@@ -1419,10 +1490,12 @@ const sections = it => it.kind ? [
   ['Задано для вложенных объектов', Object.keys(it.def).filter(k => !PAL.some(([c]) => c === k)).map(k => [k, LABELS[k] || it.params[k]?.label || k])],
 ] : [
   ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола'], ['rotation', 'Поворот (по часовой, сверху)']]],
-  ['Размер', [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
+  ['Размер', it.type === 'slats' ? [['width', 'Длина перегородки'], ['depth', 'Толщина рейки'], ['height', 'Высота']]
+    : [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
   ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
   ...(it.doors != null ? [['Фасады', [['doors', 'Дверец']]]] : []),
   ...(it.type === 'tv' ? [['Телевизор', [['panel', 'Толщина панели'], ['stand', 'Высота подставки под панелью']]]] : []),
+  ...(it.type === 'slats' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки']]]] : []),
   ...(it.type === 'portal' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки (в глубину)'], ['rail_thickness', 'Толщина рейки']]]] : []),
 ];
 
@@ -1474,6 +1547,13 @@ function renderEditor() {
       btn('fields').append(f);
     });
   });
+  if (hasColor(it)) {                                                 // the one main colour of a simple object
+    const inp = el('input'); inp.type = 'color'; inp.title = 'Основной цвет'; cinputs.color = inp;
+    inp.value = it.color || models[it.model]?.base || '#c9b8a6';
+    inp.oninput = () => { record(it.id + '.color'); it.def.color = it.color = inp.value; saveEdits(); build(); renderTree(); refresh(); };
+    const l = el('label', 'ocol'); l.append(inp, el('span', '', it.model ? 'Основной цвет (остальные части модели — в тон)' : 'Цвет'));
+    btn('fields').append(el('div', 'stitle', 'Цвет'), l);
+  }
   if (it.type === 'kitchen') {                                        // the palette of every `kitchen:` cabinet of the room
     const g = el('div', 'kcol');
     PAL.forEach(([k, label]) => {
@@ -1497,6 +1577,7 @@ function refresh() {
       num.classList.toggle('mod', diff(k));
     });
     PAL.forEach(([k]) => { if (cinputs[k]) { cinputs[k].value = it[k]; cinputs[k].classList.toggle('mod', diff(k)); } });
+    if (cinputs.color) { cinputs.color.value = it.color || models[it.model]?.base || '#c9b8a6'; cinputs.color.classList.toggle('mod', diff('color')); }
     btn('eundo').hidden = !Object.keys({ ...inputs, ...cinputs }).some(diff);
     const w = edgeOf(it);
     btn('ehint').textContent = (w ? `Стена ${it.wall}: ${r1(w.L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(w.L - it.position - it.width)} см.` : '')
@@ -1524,7 +1605,7 @@ function yamlText() {
         .map(k => f(k, fmt(o.def[k]))),
       ...(ps.length ? [f('params', `{${ps.map(n => `${n}: {value: ${fmt(o.def[n])}, label: ${JSON.stringify(o.params[n].label)}}`).join(', ')}}`)] : []),
       ...(o.type === 'kitchen' ? PAL.map(([c]) => f(c, `"${o[c]}"`)) : []),
-      ...(isGroup(o) ? [] : [f('color', `"${o.color}"`)]),
+      ...(isGroup(o) || !o.color ? [] : [f('color', `"${o.color}"`)]),
       ...(o.kitchen ? [f('kitchen', o.kitchen)] : []), ...(o.facade_side ? [f('facade_side', o.facade_side)] : []),
       ...(o.doors != null && o.type !== 'kitchen' ? [f('facade', `"${o.facade}"`)] : []), ...(o.valve ? [f('valve', o.valve)] : []),
       ...(o.model ? [f('model', o.model)] : []),
@@ -1612,6 +1693,53 @@ renderer.domElement.addEventListener('pointerup', e => {
   }
   revealSel();
 });
+// ---------- right mouse button: look around, like turning your head (the middle button pans) ----------
+// The camera stays where it is; the view direction turns (mouse right = look right, mouse up = look up, as in a first-person
+// game). The orbit target is carried along at the same distance, so orbiting with the left button and zooming still work after.
+controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;                // OrbitControls would dolly on it
+controls.mouseButtons.RIGHT = null;                            // ... and pan on this one: the look-around below takes it
+{
+  const el = renderer.domElement, off = new THREE.Vector3(), sph = new THREE.Spherical();
+  const LOOK = 2;                                              // x the picture's own scale: 1 px of drag = LOOK px of turn at the screen centre
+  let look = null;
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 2) return;
+    e.preventDefault();
+    look = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch { /* the drag still works while the pointer is over the page */ }
+  });
+  el.addEventListener('pointermove', e => {
+    if (!look || e.pointerId !== look.id) return;
+    if (!(e.buttons & 2)) { endLook(); return; }                // the release was lost (context menu, left the window): do not stay in look mode
+    const k =THREE.MathUtils.degToRad(persp.fov) / el.clientHeight * LOOK, dx = e.clientX - look.x, dy = e.clientY - look.y;
+    look.x = e.clientX; look.y = e.clientY;
+    off.subVectors(controls.target, camera.position);
+    sph.setFromVector3(off);                                   // theta: around the vertical axis, phi: down from straight up
+    sph.theta -= dx * k;
+    sph.phi = clamp(sph.phi + dy * k, .02, Math.PI - .02);     // never over the top: the view does not flip
+    off.setFromSpherical(sph);
+    controls.target.copy(camera.position).add(off);
+    controls.update();
+  });
+  // The orbit centre (controls.target) travelled with the view while looking, so it may hang in mid-air and the left button
+  // would turn "around nothing". When the look ends it moves to what is at the centre of the screen (an object, a wall, the
+  // floor): a point on the view axis, so the picture does not change, but orbiting is around something you see. Looking into the
+  // void: the same direction at the distance of the room's centre.
+  const rc = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
+  function endLook() {
+    if (!look) return;
+    look = null;
+    rc.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const h = rc.intersectObjects([...pickables.filter(o => o.visible && o.parent.visible), floor], false)[0];
+    const p = h ? h.point : rc.ray.intersectPlane(floorPlane, hitPt)
+      || hitPt.copy(camera.position).addScaledVector(rc.ray.direction, camera.position.distanceTo(P(cx, cy, 0)));
+    if (p.distanceTo(camera.position) > .2) { controls.target.copy(p); controls.update(); }
+  }
+  const stop = e => { if (look && e.pointerId === look.id) endLook(); };
+  el.addEventListener('pointerup', stop); el.addEventListener('pointercancel', stop);
+  el.addEventListener('lostpointercapture', stop); addEventListener('blur', endLook);
+  el.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });   // no browser autoscroll on the middle button
+}
 // picked on the scene: open its tree group and scroll the tree so the row sits in the middle
 // (not on a click in the tree itself: the list must not jump under the pointer)
 function revealSel() {
@@ -1676,7 +1804,8 @@ function resize() {
 addEventListener('resize', resize); resize();
 useCamera(camera);
 setView(location.hash === '#top' ? 'top' : view);
-if (location.hash !== '#top' && Array.isArray(ui.cam?.p) && Array.isArray(ui.cam?.t)) {   // exact camera pose from last time
+// exact camera pose from last time (a saved NaN, e.g. from a zero-size window, would leave the scene empty for good: skipped)
+if (location.hash !== '#top' && Array.isArray(ui.cam?.p) && Array.isArray(ui.cam?.t) && [...ui.cam.p, ...ui.cam.t].every(Number.isFinite)) {
   camera.position.fromArray(ui.cam.p); controls.target.fromArray(ui.cam.t);
   camera.zoom = ui.cam.z || 1; camera.updateProjectionMatrix(); quietly(() => controls.update());
 }

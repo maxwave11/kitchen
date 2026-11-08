@@ -60,6 +60,10 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                type: portal  -> a П-shaped arch of `rails` identical frames spread evenly over `depth`
                       (from the wall into the room); rail_width = size of one frame along the depth,
                       rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
+               type: slats   -> a wall of `rails` identical vertical slats spread evenly over `width` (along the wall,
+                      first at `position`, last ends at position + width); rail_width = one slat along the wall,
+                      depth = slat thickness, height from `elevation` (270 = to the ceiling). A free-standing partition:
+                      stand it against the wall that is parallel to it and move it away with `gap`
                type: table   -> a slab (`top` thick, default 4) on four square legs (`leg` section, default 5),
                       5 cm in from the edges; height = to the top surface; kitchen: true = slab in the worktop colour
                doors: N      -> any plain box gets N equal doors on its room side in `facade` ("#rrggbb", default white),
@@ -125,7 +129,7 @@ def by_id(items):
 
 REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
            "against": "wall", "group": "parent: <id of a type: group object>"}
-SHAPES = ("portal", "table", "tv", "radiator", "rug")      # objects drawn in their own way (not a plain box)
+SHAPES = ("portal", "slats", "table", "tv", "radiator", "rug")      # objects drawn in their own way (not a plain box)
 CONTAINERS = ("group", "kitchen")                     # objects without geometry: they hold the sizes their children inherit
 NUMERIC = ("position", "gap", "elevation", "rotation", "width", "depth", "height", "top")
 
@@ -160,7 +164,7 @@ def make_object(o, wall_ids, embed_model, where):
     out = {
         "id": o["id"], "label": o.get("label") or o["id"], "type": kind, "parent": o.get("parent"), "wall": o.get("wall"),
         **{k: raw(o.get(k)) for k in NUMERIC},          # None = not set: inherited from the parent, else a default
-        "color": o.get("color") or COLORS["other"], "params": params,
+        "color": o.get("color") or (None if o.get("model") else COLORS["other"]), "params": params,
         "model": embed_model(o["id"], o["model"]) if o.get("model") else None,
         "cutout": o.get("cutout") if isinstance(o.get("cutout"), dict) else None,
         "kitchen": "panel" if o.get("kitchen") == "panel" else bool(o.get("kitchen")),
@@ -171,6 +175,8 @@ def make_object(o, wall_ids, embed_model, where):
     if kind == "portal":
         out.update({"rails": raw(o.get("rails"), 6), "rail_width": raw(o.get("rail_width"), 2),
                     "rail_thickness": raw(o.get("rail_thickness"), 4)})
+    elif kind == "slats":
+        out.update({"rails": raw(o.get("rails"), 10), "rail_width": raw(o.get("rail_width"), 4)})
     elif kind == "table":
         out.update({"top": raw(o.get("top"), 4), "leg": raw(o.get("leg"), 5)})
     elif kind == "tv":

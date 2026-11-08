@@ -33,7 +33,7 @@ LOCK = threading.Lock()                          # one save / rebuild at a time
 
 NUMBERS = {"position", "gap", "elevation", "rotation", "width", "depth", "height", "top",
            "rails", "rail_width", "rail_thickness", "leg", "sill", "mullion", "doors", "panel", "stand"}
-COLORS = {"facade", "carcass", "worktop"}
+COLORS = {"facade", "carcass", "worktop", "color"}
 LINK = re.compile(r"^=[\w\s.+\-*/()]*$")        # "=lower.height + lower.top"
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 YAML_KEY = {"sill": "sill_height"}              # viewer name -> YAML name (windows)
