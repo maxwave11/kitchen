@@ -25,7 +25,9 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                and HEIGHT - never by sizes along the X / Y axes (x, y, sx, sy, against, items: are rejected):
                id, label, wall, position (cm from the wall's
                first corner), width (along the wall), depth (from the wall), height, elevation (default 0),
-               gap (wall to back of the object, default 0), top (countertop thickness, optional), color,
+               gap (wall to back of the object, default 0),
+               rotation (degrees clockwise seen from above, about the centre of the box, default 0; the box is
+                      still described against its wall - only its drawing turns), top (countertop thickness, optional), color,
                model (optional .glb, path from the repo root or the YAML's folder; embedded into the HTML;
                       its bounding box is fitted into the object's box, its front (+Z) faces the room;
                       a manufacturer's .3ds converts with tools/room3d/tds_to_glb.py),
@@ -109,7 +111,7 @@ def by_id(items):
 REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
            "against": "wall", "group": "parent: <id of a type: group object>"}
 CONTAINERS = ("group", "kitchen")                     # objects without geometry: they hold the sizes their children inherit
-NUMERIC = ("position", "gap", "elevation", "width", "depth", "height", "top")
+NUMERIC = ("position", "gap", "elevation", "rotation", "width", "depth", "height", "top")
 
 
 def raw(v, default=None):

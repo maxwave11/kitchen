@@ -130,8 +130,10 @@
   <details class="help"><summary>Управление мышью</summary>
     Вращение: левая кнопка / один палец. Сдвиг: правая кнопка / два пальца. Масштаб: колесо / щипок.
     Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
-    Перемещение: второй клик по уже выбранному предмету включает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
+    Перемещение: клик по предмету выбирает его и показывает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
     квадраты между стрелками двигают сразу по двум осям. Шаг 0,5 см, границы те же, что у ползунков, Ctrl+Z отменяет.<br>
+    Каждый следующий клик по нему же: кольцо поворота в горизонтальной плоскости (шаг 45°), затем контролы пропадают
+    (предмет остаётся выбранным), потом снова стрелки. Выбор из списка справа показывает только рамку.<br>
     Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</details>
 </div>
 <div id="side" class="panel">
@@ -199,7 +201,7 @@ const edgeOf = it => roomById(it.room).edges.find(e => e.id === it.wall);
 // An object's `def` is what the YAML says per field: a number, an "=expression" (a link) or nothing; the resolved number
 // is it[k] and everything else reads that. Nothing set -> the field is inherited along the `parent` chain, else a default.
 const INHERIT = ['height', 'depth', 'elevation', 'gap', 'top'];
-const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, gap: 0 };
+const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, gap: 0, rotation: 0 };
 const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a container: no geometry, holds sizes and the palette
 // the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
 const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
@@ -321,7 +323,7 @@ function saveUi() {                                // debounced: camera 'change'
 // An edit is dropped if the YAML value it was made against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill'],
-  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'] };   // rails*: type portal, leg: type table
+  object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'] };   // rails*: type portal, leg: type table
 const kindOf = it => it.kind ? 'hole' : 'object';
 const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
@@ -393,6 +395,7 @@ const rangeOf = (it, k) => {
   return ({
     position: [0, L - it.width], width: [it.kind ? 10 : 1, L], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
     sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap],
+    rotation: [0, 359],                                       // degrees clockwise seen from above, about the centre of the box
     gap: [-(it.depth + 40), perp - it.depth], top: [0, 10],   // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
     rails: [1, 40], rail_width: [.5, it.depth / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
     leg: [1, Math.min(it.width, it.depth) / 2],
@@ -587,9 +590,7 @@ function build() {
 
   // objects[] of every room (same format everywhere): standing on a wall (position/width along it, gap+depth into the room).
   // A label only on the selected one, to keep the scene readable.
-  ROOMS.forEach(room => room.objects.forEach(o => {
-    const w = edgeOf(o);
-    if (!w || hid.has(o.id)) return;
+  const placeObject = (room, o, w) => {
     const picked = underSel(o);
     if (o.type === 'portal') return placePortal(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
@@ -649,8 +650,26 @@ function build() {
       const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
       l.position.set(0, (o.height + (o.top || 0)) * S / 2 + .08, 0); body.add(l);
     }
+  };
+  ROOMS.forEach(room => room.objects.forEach(o => {
+    const w = edgeOf(o);
+    if (!w || hid.has(o.id)) return;
+    const n0 = root.children.length;
+    placeObject(room, o, w);
+    spin(o, w, n0);
   }));
   R.apartment.forEach(buildRoomShell);
+}
+
+// rotation (deg, clockwise seen from above) of an object about the vertical axis through the centre of its box: everything
+// drawn for it since root.children[n0] moves into one group that is turned. three.js rotation.y is counter-clockwise, hence the minus.
+function spin(o, w, n0) {
+  if (!o.rotation) return;
+  const u = o.position + o.width / 2, t = o.gap + o.depth / 2;
+  const c = P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, 0), g = new THREE.Group();
+  g.position.copy(c); g.rotation.y = -o.rotation * Math.PI / 180;
+  root.children.slice(n0).forEach(k => { root.remove(k); k.position.sub(c); g.add(k); });
+  root.add(g);
 }
 
 // room name + area in the middle and the corner letters (A, B, C...) just outside each corner: the same for every room
@@ -998,7 +1017,7 @@ function cutBtn(cut, fn) {
 function setSolid(ids, on) { record(); ids.forEach(id => on ? solid.add(id) : solid.delete(id)); renderTree(); renderEditor(); saveUi(); }
 function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); syncGizmo(); saveUi(); }
 function select(id) {
-  if (id !== sel) gizmoOn = false;                  // the move gizmo belongs to one selected item
+  if (id !== sel) gizmoMode = 0;                    // the gizmo belongs to one selected item
   sel = id; build(); renderTree(); renderEditor(); syncGizmo(); saveUi();   // renderEditor() returns early with no item, so sync here too
   if (phone.matches) sheet('side', !!id);          // phone: a tap on an object opens its editor, a tap on empty space closes the sheet
 }
@@ -1094,7 +1113,7 @@ const sections = it => it.kind ? [
 ] : isGroup(it) ? [
   ['Задано для вложенных объектов', Object.keys(it.def).filter(k => !PAL.some(([c]) => c === k)).map(k => [k, LABELS[k] || it.params[k]?.label || k])],
 ] : [
-  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола']]],
+  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола'], ['rotation', 'Поворот (по часовой, сверху)']]],
   ['Размер', [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
   ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
   ...(it.type === 'portal' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки (в глубину)'], ['rail_thickness', 'Толщина рейки']]]] : []),
@@ -1125,12 +1144,12 @@ function renderEditor() {
     rows.forEach(([k, label]) => {
       const link = it.link[k], was = origById[it.id].link[k];     // link: the value is derived (formula / parent); was: it was in the YAML
       const num = el('input'); num.type = 'number'; num.step = 1;
-      const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' ? 1 : .5;   // slider and number box edit the same value
+      const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' ? 1 : k === 'rotation' ? 5 : .5;   // slider and number box edit the same value
       num.oninput = rng.oninput = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setField(it, k, v); };
       num.onchange = () => { num.value = r1(it[k]); };                // show the clamped value
       inputs[k] = { num, rng };
       num.disabled = rng.disabled = !!link;                           // derived: edit its source, or unlock it
-      const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' ? 'шт' : 'см'));
+      const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' ? 'шт' : k === 'rotation' ? '°' : 'см'));
       const top = el('div', 'top'); top.append(el('span', '', label));
       if (link || was) {                                              // 🔗 linked -> set by hand;  🔓 set by hand -> back to the link
         const b = el('button', 'eye', link ? '🔗' : '🔓');
@@ -1193,7 +1212,8 @@ function yamlText() {
     const f = (k, v) => `${p}  ${k}: ${v}`, ps = Object.keys(o.params || {});
     return [`${p}- id: ${o.id}`, f('label', JSON.stringify(o.label)), ...(o.type ? [f('type', o.type)] : []),
       ...(o.parent ? [f('parent', o.parent)] : []), ...(o.wall ? [f('wall', o.wall)] : []),
-      ...KEYS.object.filter(k => o.def[k] !== undefined && !(['gap', 'elevation'].includes(k) && o.def[k] === 0 && !o.parent))   // zero gap/elevation are defaults
+      ...KEYS.object.filter(k => o.def[k] !== undefined && !(['gap', 'elevation'].includes(k) && o.def[k] === 0 && !o.parent)   // zero gap/elevation are defaults
+        && !(k === 'rotation' && !o.def[k]))                                                                                     // so is zero rotation
         .map(k => f(k, fmt(o.def[k]))),
       ...(ps.length ? [f('params', `{${ps.map(n => `${n}: {value: ${fmt(o.def[n])}, label: ${JSON.stringify(o.params[n].label)}}`).join(', ')}}`)] : []),
       ...(o.type === 'kitchen' ? PAL.map(([c]) => f(c, `"${o[c]}"`)) : []),
@@ -1216,25 +1236,34 @@ function resetItems(items) {
 btn('eundo').onclick = () => resetItems([byId(sel)]);
 btn('byaml').onclick = () => btn('ydlg').showModal();
 
-// ---------- move gizmo: three arrows (+ plane squares) on the selected item, like in any 3D editor ----------
-// three.js TransformControls (translate mode, local space) drives an invisible proxy placed at the centre of the item's box.
-// Its axes are the item's own: red = along the wall (position), green = up (elevation / sill), blue = from the wall (gap).
-// Dragging does not move any mesh: the proxy's position is converted back to the item's wall fields and the scene is rebuilt,
+// ---------- gizmo on the selected item, like in any 3D editor: move -> rotate -> off, one step per click on it ----------
+// three.js TransformControls drives an invisible proxy placed at the centre of the item's box (gizmoMode 1 = translate,
+// 2 = rotate, 0 = none). Translate axes are the wall's: red = along the wall (position), green = up (elevation / sill),
+// blue = from the wall (gap). Rotate has one ring, the vertical axis (rotation, snapped to 45 degrees).
+// Dragging does not move any mesh: the proxy is converted back to the item's fields and the scene is rebuilt,
 // so limits (clamp), undo, localStorage and the YAML export work exactly as for the sliders.
+const SNAP = 45;                                                                       // degrees
 function syncGizmo() {
   const it = byId(sel), w = it && !wallRow(sel) && edgeOf(it);
-  if (!w || !gizmoOn || (it.kind ? hid.has(shellId(MAIN)) : hid.has(it.id))) { tc.detach(); return; }
+  if (!w || !gizmoMode || (it.kind ? hid.has(shellId(MAIN)) : hid.has(it.id))) { tc.detach(); return; }
   const u = it.position + it.width / 2, t = it.kind ? 0 : it.gap + it.depth / 2;       // openings sit in the wall line
   const z = it.kind ? (it.sill || 0) + it.height / 2 : it.elevation + it.height / 2;
+  const turn = gizmoMode === 2;
   proxy.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, z));
-  proxy.rotation.y = Math.atan2(w.dy, w.dx);
-  tc.showX = true; tc.showY = it.kind !== 'door'; tc.showZ = !it.kind;                 // a door only slides along its wall, a window also up
+  proxy.rotation.y = Math.atan2(w.dy, w.dx) - (turn ? (it.rotation || 0) * Math.PI / 180 : 0);   // the ring follows the object
+  tc.setMode(turn ? 'rotate' : 'translate');
+  tc.showX = !turn; tc.showY = turn || it.kind !== 'door'; tc.showZ = !turn && !it.kind;   // a door only slides along its wall, a window also up
   tc.attach(proxy);
 }
 function dragGizmo() {
   const it = byId(sel), w = it && edgeOf(it);
   if (!w) return;
   if (dragFresh) { record(); dragFresh = false; }                                      // one undo step per drag
+  if (tc.mode === 'rotate') {                                                          // angle of the proxy's x axis in the plan -> degrees clockwise from the wall
+    const v = new THREE.Vector3(1, 0, 0).applyQuaternion(proxy.quaternion);            // (a quaternion: Euler angles of a pure Y turn flip past 90 degrees)
+    const deg = -(Math.atan2(-v.z, v.x) - Math.atan2(w.dy, w.dx)) * 180 / Math.PI;
+    return applyPatch(it, { rotation: ((Math.round(deg / SNAP) * SNAP) % 360 + 360) % 360 });
+  }
   const p = proxy.position, px = p.x / S - w.a[0], py = -p.z / S - w.a[1], z = p.y / S;
   const u = px * w.dx + py * w.dy, t = -(px * w.nx + py * w.ny);                       // along the wall / from it into the room
   const half = v => Math.round(v * 2) / 2, ax = tc.axis || '', patch = {};            // 0.5 cm steps, like the sliders
@@ -1249,9 +1278,10 @@ const tc = new TransformControls(camera, renderer.domElement);
 tc.setMode('translate'); tc.setSpace('local'); tc.setSize(.8);
 gizmoScene.add(tc.getHelper());
 let dragFresh = false;
-// the first click only selects (orange box); a second click on the already selected item turns the gizmo on.
-// Another item, empty space or Esc selects something else / nothing, and the gizmo is off again.
-let gizmoOn = false;
+// A click on an item in the scene selects it and shows the move gizmo; each further click on it goes on: rotate, then
+// nothing (the item stays selected, orange box), then move again. Openings have no rotation. Another item, empty space
+// or Esc selects something else / nothing. Selecting from the tree shows only the box.
+let gizmoMode = 0;
 tc.addEventListener('dragging-changed', e => { controls.enabled = !e.value; dragFresh = e.value; });
 tc.addEventListener('objectChange', dragGizmo);
 
@@ -1265,9 +1295,13 @@ renderer.domElement.addEventListener('pointerup', e => {
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
   // the raycaster ignores `visible`, so skip cut-away walls and the openings of a hidden wall by hand
   const id = ray.intersectObjects(pickables.filter(o => o.visible && o.parent.visible), false)[0]?.object.userData.id ?? null;
-  const again = id !== null && id === sel;                     // second click on the selected item
+  const again = id !== null && id === sel;                     // another click on the selected item
   select(id);
-  if (again) { gizmoOn = true; syncGizmo(); }
+  if (id !== null && byId(id)) {                               // (not a wall: it has no gizmo)
+    gizmoMode = again ? (gizmoMode + 1) % 3 : 1;
+    if (byId(id).kind && gizmoMode === 2) gizmoMode = 0;       // an opening: move, then off
+    syncGizmo();
+  }
   revealSel();
 });
 // picked on the scene: open its tree group and scroll the tree so the row sits in the middle
