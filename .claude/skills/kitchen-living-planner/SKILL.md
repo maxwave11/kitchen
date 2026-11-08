@@ -45,6 +45,16 @@ If the user gives only overall dimensions, write a rectangle and mark unknowns a
    `wall_thickness`, window `sill_height` / `height`, opening `height` / `swing: in|out` /
    `hinge: start|end`, built-in `height` / `elevation` / `color` / `countertop` /
    `upper: {depth, height, elevation}`, furniture `color` / `elevation`.
+   **Objects (furniture, cabinets, appliances, door leaves) go into `objects:`, the same format in every
+   room** (this file and `rooms[].objects` of `apartment.yaml`): `wall` + `position` + `gap`, and always
+   **`width` (along the wall) x `depth` (away from it) x `height`** - never sizes "along X / along Y"
+   (`x`, `y`, `sx`, `sy`, `against`, `items:` are rejected by the 3D build). The kitchen-living room is an
+   ordinary room: no special rules for it, only its data lives in `rooms/kitchen-living.yaml`.
+   **Inheritance:** the kitchen is ONE `type: kitchen` object (palette `facade` / `carcass` / `worktop`) with `type: group`
+   parts `lower` (height, depth, top) and `upper` (`params.level`); a cabinet gets `parent: lower|upper` and does not repeat
+   what the part defines. Derived numbers are links `"=portal.height"`, `"=lower.height + lower.top"` (bare name = own
+   property, `id.name` = another object's). Do not copy a height that is already defined elsewhere: link or inherit it.
+   Syntax and limits: `tools/room3d/README.md`.
 3. Validate geometry: `python3 tools/planhaus/scripts/room_spatial.py rooms/kitchen-living.yaml --check`
    — the trace must close and the area must match the official one within 5%. On mismatch,
    ask the user to re-measure; do not fudge lengths.

@@ -19,8 +19,11 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                color ("#rrggbb"), countertop: true|false (default true for kitchen),
                upper: {depth: 35, height: 72, elevation: 145}   # wall cabinets above
   furniture[]: color, elevation (cm above floor; overrides mount/on logic)
-  objects[]:   boxes that stand against a wall and stay flush with it; edited in the viewer
-               (not checked by the rules engine): id, label, group, wall, position (cm from the wall's
+  objects[]:   everything that stands in a room - furniture, cabinets, appliances, door leaves. The SAME format in
+               every room (this YAML and `rooms[].objects` of apartment.yaml); edited in the viewer, not checked by
+               the rules engine. An object stands against a wall of its room and is described by its WIDTH, DEPTH
+               and HEIGHT - never by sizes along the X / Y axes (x, y, sx, sy, against, items: are rejected):
+               id, label, wall, position (cm from the wall's
                first corner), width (along the wall), depth (from the wall), height, elevation (default 0),
                gap (wall to back of the object, default 0), top (countertop thickness, optional), color,
                model (optional .glb, path from the repo root or the YAML's folder; embedded into the HTML;
@@ -28,12 +31,24 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       a manufacturer's .3ds converts with tools/room3d/tds_to_glb.py),
                cutout: {in: <object id>, width, depth}   # hole of that size, centred under this object,
                       through the other object's body and worktop (a sink in a base cabinet)
-               kitchen: true -> a kitchen cabinet: body in kitchen_colors.carcass, a front panel in
-                      kitchen_colors.facade (the side facing the room), worktop (`top`) in kitchen_colors.worktop;
-               kitchen: panel -> a plain board (end panel, divider) wholly in kitchen_colors.carcass, no front;
+               kitchen: true -> a kitchen cabinet: body in the carcass colour of the room's `type: kitchen` object,
+                      a front panel in its facade colour (the side facing the room), worktop (`top`) in its worktop colour;
+               kitchen: panel -> a plain board (end panel, divider) wholly in the carcass colour, no front;
                facade_side: start | end  -> the front panel on the side facing the wall's first / second corner
                       instead (a peninsula with its doors towards the kitchen run)
-  kitchen_colors: {facade, carcass, worktop}   # one palette for the whole kitchen, edited in the viewer
+  INHERITANCE AND LINKS (same in every room):
+               parent: <id of a `type: group` / `type: kitchen` object>  -> a container without geometry that
+                      groups objects in the tree. An object that does not set height / depth / elevation / gap / top
+                      takes them from its parent (and from the parent's parent...). Typical: a kitchen = one
+                      `type: kitchen` object (facade / carcass / worktop colours of every `kitchen:` cabinet) with
+                      parts `lower` (height, depth, top) and `upper`; every cabinet inside inherits from its part.
+               params: {level: 260}  or  {level: {value: 260, label: "..."}}   own numbers of a container
+               any number may be a LINK: "=<expression>" (quote it). A bare name is a property of this very object,
+                      `id.name` is a property of another object / opening of the room: "=upper.level - elevation",
+                      "=lower.height + lower.top", "=portal.width + 1". Operators + - * / and (); put spaces
+                      around a minus (ids contain hyphens). An inherited link is evaluated for the child.
+                      Openings: only `height` may be a link (position / width are read by the rules engine).
+               type: kitchen -> also facade, carcass, worktop ("#rrggbb"): the palette of the room's kitchen
                type: portal  -> a П-shaped arch of `rails` identical frames spread evenly over `depth`
                       (from the wall into the room); rail_width = size of one frame along the depth,
                       rail_thickness = its profile (legs and top bar); width/height = outer size of the arch
@@ -43,13 +58,15 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
 Coordinates: origin = corner A, X = east, Y = north, cm (planhaus convention).
 
 The rest of the apartment comes from apartment.yaml (next to rooms/, or --apartment) when its
-`frame:` is this room's id: per room a floor polygon, wall boxes, glass panes and furniture boxes,
-all in this room's coordinates (format in apartment.yaml). The viewer lists each room in its tree,
-hidden until the user shows it.
+`frame:` is this room's id: per room a floor polygon, wall boxes, glass panes and `objects:`, all in this
+room's coordinates (format in apartment.yaml). A room's walls for `wall:` are the edges of its floor outline,
+A-B, B-C, ... in the order of `floor` (the kitchen: its own walls). The viewer lists every room, this one
+included, as an equal tree node with the same parts - walls, openings, objects; the other rooms start hidden.
 """
 import argparse
 import base64
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -89,8 +106,81 @@ def by_id(items):
     return {i.get("id"): i for i in (items or []) if isinstance(i, dict)}
 
 
-def load_apartment(path, room_id, required):
-    """Other rooms of the apartment, in this room's coordinates, as context for the viewer."""
+REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
+           "against": "wall", "group": "parent: <id of a type: group object>"}
+CONTAINERS = ("group", "kitchen")                     # objects without geometry: they hold the sizes their children inherit
+NUMERIC = ("position", "gap", "elevation", "width", "depth", "height", "top")
+
+
+def raw(v, default=None):
+    """A number, an "=expression" (a link, evaluated by the viewer) or the default."""
+    if isinstance(v, str) and v.strip().startswith("="):
+        return v.strip()
+    try:
+        return float(v) if v is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
+def make_object(o, wall_ids, embed_model, where):
+    """One room object, the same for every room. Returns None (with a message) if it cannot be placed."""
+    if not (isinstance(o, dict) and o.get("id")):
+        return None
+    bad = [f"{k} (use {v})" for k, v in REMOVED.items() if k in o]
+    if bad:
+        sys.exit(f"{where}[{o['id']}]: not allowed: {', '.join(bad)}. An object has wall + position + gap and "
+                 f"width (along the wall) x depth (away from it) x height")
+    kind = o.get("type") if o.get("type") in ("portal", "table") + CONTAINERS else None
+    if kind not in CONTAINERS and o.get("wall") not in wall_ids:
+        sys.stderr.write(f"{where}[{o['id']}]: wall {o.get('wall')!r} is not a wall of this room "
+                         f"({', '.join(sorted(wall_ids))}), skipped\n")
+        return None
+    params = {}
+    for name, v in (o.get("params") or {}).items():
+        params[name] = {"value": raw(v.get("value") if isinstance(v, dict) else v, 0),
+                        "label": (v.get("label") if isinstance(v, dict) else None) or name}
+    out = {
+        "id": o["id"], "label": o.get("label") or o["id"], "type": kind, "parent": o.get("parent"), "wall": o.get("wall"),
+        **{k: raw(o.get(k)) for k in NUMERIC},          # None = not set: inherited from the parent, else a default
+        "color": o.get("color") or COLORS["other"], "params": params,
+        "model": embed_model(o["id"], o["model"]) if o.get("model") else None,
+        "cutout": o.get("cutout") if isinstance(o.get("cutout"), dict) else None,
+        "kitchen": "panel" if o.get("kitchen") == "panel" else bool(o.get("kitchen")),
+        "facade_side": o.get("facade_side") if o.get("facade_side") in ("start", "end") else None,
+    }
+    if kind == "kitchen":
+        out.update({k: str(o.get(k) or COLORS["other"]) for k in ("facade", "carcass", "worktop")})
+    if kind == "portal":
+        out.update({"rails": raw(o.get("rails"), 6), "rail_width": raw(o.get("rail_width"), 2),
+                    "rail_thickness": raw(o.get("rail_thickness"), 4)})
+    elif kind == "table":
+        out.update({"top": raw(o.get("top"), 4), "leg": raw(o.get("leg"), 5)})
+    return out
+
+
+def check_links(objects, openings, where):
+    """parent ids exist and are containers, no loops, every id used in an "=expression" exists."""
+    by = {o["id"]: o for o in objects}
+    ids = set(by) | {h["id"] for h in openings}
+    for o in objects:
+        p = o["parent"]
+        if p is not None and (p not in by or by[p]["type"] not in CONTAINERS):
+            sys.exit(f"{where}[{o['id']}]: parent {p!r} is not a `type: group` / `type: kitchen` object of this room")
+        seen, q = set(), o
+        while q and q["parent"]:
+            if q["id"] in seen:
+                sys.exit(f"{where}[{o['id']}]: parent loop")
+            seen.add(q["id"]); q = by.get(q["parent"])
+    for o in [*objects, *openings]:
+        vals = [o.get(k) for k in NUMERIC + ("sill",)] + [p["value"] for p in o.get("params", {}).values()]
+        for v in vals:
+            for ref in re.findall(r"([A-Za-z_][\w-]*)\.[A-Za-z_]", v) if isinstance(v, str) else []:
+                if ref not in ids:
+                    sys.exit(f"{where}[{o['id']}]: link {v!r} names {ref!r}, which is not an object or opening of this room")
+
+
+def load_apartment(path, room_id, required, embed_model):
+    """Other rooms of the apartment, in this room's coordinates: the same parts as the main room."""
     if not path.is_file():
         if required:
             sys.exit(f"{path}: not found")
@@ -101,21 +191,23 @@ def load_apartment(path, room_id, required):
             sys.exit(f"{path}: frame is {apt.get('frame')!r}, not {room_id!r}")
         return []
     boxes = lambda rows, n: [[float(v) for v in r] for r in rows or [] if isinstance(r, list) and len(r) in n]
+
     rooms = []
     for r in apt.get("rooms") or []:
         if not (isinstance(r, dict) and r.get("id")):
             continue
+        if "items" in r:
+            sys.exit(f"apartment room {r['id']}: `items:` is gone - use `objects:` (wall, position, gap, width, depth, height)")
+        floor = [[float(x), float(y)] for x, y in r.get("floor") or []]
+        wall_ids = {f"{chr(65 + i)}-{chr(65 + (i + 1) % len(floor))}" for i in range(len(floor))}
+        objects = [x for x in (make_object(o, wall_ids, embed_model, f"apartment {r['id']} objects") for o in r.get("objects") or []) if x]
+        check_links(objects, [], f"apartment {r['id']} objects")
         rooms.append({
             "id": r["id"], "name": r.get("name") or r["id"], "area_m2": r.get("area_m2"),
-            "floor": [[float(x), float(y)] for x, y in r.get("floor") or []],
+            "floor": floor,
             "floor_color": r.get("floor_color"),             # none = the kitchen's laminate
             "walls": boxes(r.get("walls"), (4, 6)), "glass": boxes(r.get("glass"), (6,)),
-            "items": [{
-                "id": i["id"], "label": i.get("label") or i["id"], "room": r["id"],
-                "x": num(i.get("x"), 0), "y": num(i.get("y"), 0), "sx": num(i.get("sx"), 50), "sy": num(i.get("sy"), 50),
-                "height": num(i.get("height"), 50), "elevation": num(i.get("elevation"), 0),
-                "color": i.get("color") or COLORS["other"],
-            } for i in r.get("items") or [] if isinstance(i, dict) and i.get("id")],
+            "objects": objects,
         })
     return rooms
 
@@ -170,7 +262,7 @@ def main():
             holes.append({
                 "kind": "opening", "id": o["id"], "wall": o["wall"],
                 "position": num(y.get("position"), 0), "width": num(o.get("width"), 0),
-                "sill": 0, "height": num(y.get("height"), 210),
+                "sill": 0, "height": raw(y.get("height"), 210),
                 "has_door": bool(o.get("has_door")), "swing": y.get("swing", "in"),
                 "hinge": y.get("hinge", "start"), "to": o.get("to"),
             })
@@ -214,7 +306,7 @@ def main():
             f["elevation"] = tops[f["on"]]
 
     wall_ids = {w["id"] for w in walls}
-    objects, models = [], {}
+    models = {}
 
     def embed_model(oid, ref):
         if ref in models:
@@ -226,34 +318,17 @@ def main():
         sys.stderr.write(f"objects[{oid}]: model {ref!r} not found, drawing a box\n")
         return None
 
-    for o in room.get("objects") or []:
-        if not (isinstance(o, dict) and o.get("id")):
-            continue
-        if o.get("wall") not in wall_ids:
-            sys.stderr.write(f"objects[{o['id']}]: wall {o.get('wall')!r} is not a wall of this room, skipped\n")
-            continue
-        objects.append({
-            "id": o["id"], "label": o.get("label") or o["id"], "group": o.get("group") or "Объекты", "wall": o["wall"],
-            "position": num(o.get("position"), 0), "width": num(o.get("width"), 50), "depth": num(o.get("depth"), 50),
-            "height": num(o.get("height"), 50), "elevation": num(o.get("elevation"), 0), "gap": num(o.get("gap"), 0),
-            "top": num(o.get("top"), 0) if o.get("top") is not None else None,
-            "color": o.get("color") or COLORS["other"],
-            "model": embed_model(o["id"], o["model"]) if o.get("model") else None,
-            "cutout": o.get("cutout") if isinstance(o.get("cutout"), dict) else None,
-            "kitchen": "panel" if o.get("kitchen") == "panel" else bool(o.get("kitchen")),
-            "facade_side": o.get("facade_side") if o.get("facade_side") in ("start", "end") else None,
-        })
-        if o.get("type") == "portal":
-            objects[-1].update({"type": "portal", "rails": int(num(o.get("rails"), 6)),
-                                "rail_width": num(o.get("rail_width"), 2), "rail_thickness": num(o.get("rail_thickness"), 4)})
-        elif o.get("type") == "table":
-            objects[-1].update({"type": "table", "top": num(o.get("top"), 4), "leg": num(o.get("leg"), 5)})
+    objects = [x for x in (make_object(o, wall_ids, embed_model, "objects") for o in room.get("objects") or []) if x]
+    check_links(objects, [h for h in holes if h["kind"] == "opening"], "objects")
+    if room.get("kitchen_colors"):
+        sys.exit("kitchen_colors: is gone - put facade / carcass / worktop on the `type: kitchen` object in objects:")
+    room_id = room.get("id") or room_path.stem
 
     data = {
         "objects": objects, "models": models,
+        "id": room_id,
         "apartment": load_apartment(Path(args.apartment) if args.apartment else room_path.parent.parent / "apartment.yaml",
-                                    room.get("id") or room_path.stem, bool(args.apartment)),
-        "kitchen": {k: str(v) for k, v in (room.get("kitchen_colors") or {}).items() if k in ("facade", "carcass", "worktop")},
+                                    room_id, bool(args.apartment), embed_model),
         "name": room.get("name") or room.get("id") or room_path.stem,
         "area_m2": (room.get("validation") or {}).get("calculated_area") or room.get("area_m2"),
         "ceiling": ceiling, "thickness": thickness, "walls": walls, "holes": holes,
@@ -269,7 +344,8 @@ def main():
     html = html.replace("__ROOM_DATA__", json.dumps(data, ensure_ascii=False))
     out.write_text(html, encoding="utf-8")
     print(f"wrote {out}  ({len(walls)} walls, {len(holes)} openings, {len(built)} built-ins, {len(furn)} items, "
-          f"{len(objects)} objects, {len(data['apartment'])} other rooms)")
+          f"{len(objects)} objects, {len(data['apartment'])} other rooms with "
+          f"{sum(len(r['objects']) for r in data['apartment'])} objects)")
 
 
 if __name__ == "__main__":

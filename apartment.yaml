@@ -47,9 +47,19 @@ living_area_m2: 23.20      # both bedrooms
 #   walls:  [x0, y0, x1, y1]          full-height wall box (any two opposite corners)
 #           [x0, y0, x1, y1, z0, z1]  partial box: lintel over a door, wall under a window
 #   glass:  [x0, y0, x1, y1, z0, z1]  window / balcony door pane
-#   items:  boxes, edited in the viewer like the kitchen objects:
-#           x, y = corner with the smallest X and Y; sx = size along X, sy = size along Y;
-#           height, elevation (cm above the floor, default 0), color
+#   objects: furniture, doors, boxes - the SAME format as `objects:` in rooms/kitchen-living.yaml, every room alike.
+#           An object stands against a wall of its room: the outline of `floor` gives the walls A-B, B-C, ...
+#           (corner A = first point of `floor`; the corners are listed in a comment above each `objects:`).
+#             wall      wall id, e.g. D-A
+#             position  cm along that wall, from its first corner (D) to the object's near edge
+#             gap       cm from the wall plane into the room (default 0; < 0 = behind / inside the wall, e.g. a door leaf)
+#             width     cm ALONG the wall        depth  cm AWAY from the wall        height  cm
+#             elevation cm above the floor (default 0), color "#rrggbb", label, group (optional tree folder)
+#           Size is ALWAYS width x depth x height - never "along X / along Y". Same optional fields as the kitchen's
+#           objects: top, type: table | portal, model, cutout, kitchen (see tools/room3d/README.md).
+#           Inheritance: `parent:` (a `type: group` object) gives its height / depth / elevation / gap / top to children that
+#           do not set them; any number may be a link "=other-id.height + 5" (README, "Контейнеры, наследование и ссылки").
+#           The old x / y / sx / sy / against / items: are rejected by the build.
 # -----------------------------------------------------------
 frame: kitchen-living
 height: 270
@@ -64,29 +74,32 @@ rooms:
       - [623, -37, 649, -60.5]                # stub between bathroom and entrance door
       - [649, -37, 741.5, -60.5, 210, 270]    # lintel over the entrance door
       - [548.2, 296, 801, 334]                # outer wall behind the ventilation and the WC
-    items:
+    # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
+    # A=(350, -12)  B=(350, -134.5)  C=(623, -134.5)  D=(623, -37)  E=(809, -37)  F=(809, 181.5)  G=(548.2, 181.5)  H=(548.2, -12)
+    objects:
       - id: wardrobe
         label: "Шкаф (вдоль стены туалета)"
-        x: 548.2
-        y: 121.5
-        sx: 180
-        sy: 60
+        wall: F-G
+        position: 80.8
+        width: 180
+        depth: 60
         height: 240
         color: "#3b2e28"
       - id: hall-unit
         label: "Прихожая (вешалка, зеркало, тумба)"
-        x: 774
-        y: -35
-        sx: 35
-        sy: 95
+        wall: E-F
+        position: 2
+        width: 95
+        depth: 35
         height: 200
         color: "#4a3a30"
       - id: entrance-door
         label: "Входная дверь"
-        x: 651
-        y: -60
-        sx: 88.5
-        sy: 6
+        wall: D-E
+        position: 28
+        gap: -23
+        width: 88.5
+        depth: 6
         height: 205
         color: "#3a2a22"
 
@@ -100,37 +113,42 @@ rooms:
       - [740, 181.5, 801, 194, 210, 270]      # lintel over the WC door
       - [665, 194, 675, 296]                  # wall between the toilet and the ventilation box
       - [801, 182.5, 809, 306]                # wall to bedroom 13.15
-    items:
+    # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
+    # A=(675, 194)  B=(801, 194)  C=(801, 296)  D=(675, 296)
+    objects:
       - id: vent-box
         label: "Вентиляция (закрытый объём за стеной)"
-        x: 548.2
-        y: 194
-        sx: 116.8
-        sy: 102
+        wall: D-A
+        position: 0
+        gap: -126.8
+        width: 102
+        depth: 116.8
         height: 270
         color: "#ece8e1"
       - id: wc-door
         label: "Дверь туалета"
-        x: 742
-        y: 186
-        sx: 57
-        sy: 4
+        wall: A-B
+        position: 67
+        gap: -8
+        width: 57
+        depth: 4
         height: 200
         color: "#4a3a30"
       - id: toilet-tank
         label: "Бачок / инсталляция"
-        x: 675
-        y: 225
-        sx: 18
-        sy: 44
+        wall: D-A
+        position: 27
+        width: 44
+        depth: 18
         height: 80
         color: "#f4f4f2"
       - id: toilet
         label: "Унитаз"
-        x: 693
-        y: 229
-        sx: 50
-        sy: 36
+        wall: D-A
+        position: 31
+        gap: 18
+        width: 36
+        depth: 50
         height: 40
         color: "#f4f4f2"
 
@@ -151,13 +169,15 @@ rooms:
     glass:
       - [1215, 107, 1221, 204, 85, 220]       # window
       - [1215, 24.5, 1221, 107, 0, 220]       # balcony door
-    items:
+    # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
+    # A=(827, -27)  B=(1200, -27)  C=(1200, 306)  D=(827, 306)
+    objects:
       - id: bedroom-13-door
         label: "Дверь спальни (открыта)"
-        x: 827
-        y: 168.5
-        sx: 80
-        sy: 4
+        wall: D-A
+        position: 133.5
+        width: 4
+        depth: 80
         height: 200
         color: "#4a3a30"
 
@@ -186,43 +206,73 @@ rooms:
       - [623, -61.5, 644.5, -360]             # wall to the stairwell
       - [337, -325, 644.5, -360]              # wall to the neighbours
       - [337, -147, 358.5, -325]              # wall to bedroom 10.05
-      - [566, -215, 621.5, -227.5]            # washing-machine niche
-      - [566, -227.5, 577, -325]
       - [523, -289, 566, -325]                # riser box
-    items:
+    # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
+    # A=(358.5, -149)  B=(623, -149)  C=(623, -325)  D=(358.5, -325)
+    objects:
       - id: bathroom-door
         label: "Дверь ванной"
-        x: 474
-        y: -143.5
-        sx: 63.5
-        sy: 4
+        wall: A-B
+        position: 115.5
+        gap: -9.5
+        width: 63.5
+        depth: 4
         height: 200
         color: "#4a3a30"
       - id: bath
         label: "Ванна"
-        x: 361
-        y: -321
-        sx: 158
-        sy: 75
+        wall: C-D
+        position: 104
+        gap: 4
+        width: 158
+        depth: 75
         height: 58
         color: "#f4f4f2"
       - id: washbasin
         label: "Раковина"
-        x: 361
-        y: -222
-        sx: 45
-        sy: 55
-        height: 20
+        wall: D-A
+        position: 103
+        gap: 2.5
         elevation: 65
+        width: 55
+        depth: 45
+        height: 20
         color: "#f4f4f2"
+      - id: bath-vent-box
+        label: "Вентиляционный короб (решётка вверху)"
+        wall: B-C
+        position: 66
+        width: 110
+        depth: 57
+        height: 270
+        color: "#ece8e1"
       - id: washer
-        label: "Стиральная машина"
-        x: 578
-        y: -300
-        sx: 43
-        sy: 60
+        label: "Стиральная машина LG 5 кг"
+        wall: B-C
+        position: 5
+        gap: 5
+        width: 60
+        depth: 44
         height: 85
         color: "#e8e8e8"
+      - id: towel-rail
+        label: "Полотенцесушитель (оценка по фото)"
+        wall: A-B
+        position: 221.5
+        elevation: 100
+        width: 30
+        depth: 12
+        height: 70
+        color: "#c8ccd0"
+      - id: bath-cabinet
+        label: "Шкаф над стиралкой 50×30×90"
+        wall: B-C
+        position: 16
+        elevation: 140
+        width: 50
+        depth: 30
+        height: 90
+        color: "#f2efe9"
 
   - id: bedroom-10
     name: "Спальня 10,05"
@@ -239,13 +289,16 @@ rooms:
       - [-40, -61.5, 0, -241, 235, 270]       # over the window
     glass:
       - [-23, -61.5, -17, -241, 85, 235]
-    items:
+    # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
+    # A=(0, -12)  B=(337, -12)  C=(337, -329.5)  D=(0, -329.5)
+    objects:
       - id: bedroom-10-door
         label: "Дверь спальни (открыта)"
-        x: 258
-        y: -115.5
-        sx: 80
-        sy: 4
+        wall: B-C
+        position: 99.5
+        gap: -1
+        width: 4
+        depth: 80
         height: 200
         color: "#4a3a30"
 
@@ -262,5 +315,15 @@ notes: |
   2026-11-07: no niche between the WC and the kitchen (Maxim): one solid wall from the kitchen to the WC door, behind it
     a closed ventilation volume (vent-box, X 548..665). The wardrobe from the photo stands in the corridor along that
     wall, from the kitchen wall towards the WC door (180 x 60 x 240, estimate) - matches photo 2.
+  2026-11-08: bathroom from Maxim's photos: entering, the washer is on the left, against the far wall (X 623), front to
+    the room; right of it a full-height ventilation box (grille at the top, two hooks on its front) sticks out of that
+    wall - the plan's vent symbol, X 566..623 x Y -215..-325. It was drawn as two thin walls with the washer inside;
+    now one solid item (bath-vent-box), the washer moved into the slot between the door wall and the box
+    (Y -154..-214, 60 x 44 x 85, LG Direct Drive 5 kg, depth estimated). A cabinet goes above the washer later.
+  2026-11-08: proposed cabinet above the washer (bath-cabinet): wall-hung, 50 wide x 30 deep x 90 high, bottom at 140,
+    pushed against the vent box; leaves 16 cm to the door wall for the towel rail (towel-rail, position and size
+    estimated from photo 2). Door hinged on the box side (the left side would hit the towel rail), or a lift-up front.
+    Not measured yet: the slot width at 140-230 cm and the towel rail's top and depth.
+    Accepted by Maxim the same day: light matte front in the tile colour, chrome handle or push-to-open.
   TODO: measure the wardrobe (width x depth x height, where it starts from the kitchen wall), the hall unit,
     the ventilation box, the entrance door and the corridor width - the plan is only ±10-15 cm.

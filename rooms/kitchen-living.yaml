@@ -58,7 +58,7 @@ openings:
     wall: B-C
     position: 0         # cm from corner B to opening edge
     width: 80
-    height: 210         # TODO
+    height: "=portal.height"   # follows the portal (objects:)
     to: ""              # TODO: where it leads
     has_door: true      # TODO
     swing: in           # TODO
@@ -67,45 +67,66 @@ outlets: []
 heating: []
 plumbing: []     # TODO: water supply / drain riser, ventilation, gas
 
-# Kitchen palette (3D viewer): fronts of every `kitchen: true` cabinet, their carcass and all worktops.
-kitchen_colors:
-  facade: "#d49b16"
-  carcass: "#654a29"
-  worktop: "#6b6259"
-
-# 3D-only objects for the viewer (tools/room3d). Every object STANDS AGAINST A WALL and stays flush with it:
+# 3D-only objects for the viewer (tools/room3d), the SAME format as `objects:` of every room in apartment.yaml.
+# Every object STANDS AGAINST A WALL and stays flush with it:
 #   wall      wall id; the object's back is on that wall's inner surface (plus `gap`)
 #   position  cm from the wall's first corner (B for B-C) to the object's near edge, along the wall
 #   width     cm along the wall (the front side)        depth  cm from the wall into the room
 #   height    cm                                         elevation  cm above the floor (default 0)
-#   gap       cm between wall and back of the object (default 0; < 0 = sunk into the wall, down to -20)
+#   gap       cm between wall and back of the object (default 0; < 0 = sunk into the wall)
 #   top       optional countertop thickness, cm (slab on top, 2 cm front overhang)
 #   kitchen   true = cabinet in the kitchen palette (front panel + carcass + worktop); panel = plain carcass board
 #   facade_side  start | end = front panel on the side facing the wall's first / second corner
 #   model     .glb fitted into the object's box;  cutout: {in, width, depth} = hole in another object
 #   type: portal  П-shaped arch of `rails` frames (rail_width along the depth, rail_thickness profile)
+#
+# INHERITANCE (tools/room3d/README.md): `parent:` points at a `type: group` / `type: kitchen` object, a container with no
+# geometry. What a child does not set (height, depth, elevation, gap, top) it takes from its parent. Any number can also be
+# a link, "=expression": a bare name is this object's own property, `id.name` is another object's ("=lower.height + lower.top").
+#   kitchen  one object: the palette (facade / carcass / worktop) of every `kitchen:` cabinet + two parts
+#     lower  height 90 / depth 60 / worktop 4 of every lower cabinet (change it once: all follow)
+#     upper  top of the upper cabinets (params.level); a cabinet with only an `elevation` reaches up to it
+#   portal   its height is the single source: the opening door-1, the panel beside it, the cabinet over it follow
 # Saved from the 3D viewer (Maxim, 2026-11-07). Sink: Hansgrohe C51-F450-01, fridge: AEG bottom freezer,
 # both from Maxim's .3ds files (assets/models/). Sink cut-out is an estimate from the model - take the
 # real one from the Hansgrohe installation template.
 objects:
+  - id: kitchen
+    label: "Кухня"
+    type: kitchen
+    facade: "#d49b16"
+    carcass: "#654a29"
+    worktop: "#6b6259"
+  - id: lower
+    label: "Нижняя часть"
+    type: group
+    parent: kitchen
+    height: 90
+    depth: 60
+    top: 4
+  - id: upper
+    label: "Верхняя часть"
+    type: group
+    parent: kitchen
+    depth: 40
+    height: "=upper.level - elevation"
+    params:
+      level: {value: 260, label: "Верх шкафов от пола"}
   - id: e-base
     label: "Нижние шкафы (B-C)"
-    group: "Стена B-C"
+    parent: lower
     wall: B-C
     position: 144
     width: 162
-    depth: 60
-    height: 90
-    top: 4
     color: "#d8cfc4"
     kitchen: true
   - id: sink
     label: "Мойка Hansgrohe C51-F450-01"
-    group: "Стена B-C"
+    parent: kitchen
     wall: B-C
     position: 173.1
     gap: 5
-    elevation: 65.5
+    elevation: "=lower.height - 24.5"   # the basin hangs 24.5 cm under the worktop line
     width: 56
     depth: 52
     height: 62.5
@@ -114,28 +135,26 @@ objects:
     cutout: {in: e-base, width: 53, depth: 49}
   - id: e-upper
     label: "Верхний шкаф (B-C)"
-    group: "Стена B-C"
+    parent: upper
     wall: B-C
     position: 144
     elevation: 160
     width: 162
-    depth: 40
-    height: 99.5
     color: "#e9e6df"
     kitchen: true
   - id: fridge-panel
     label: "Панель ДСП между порталом и холодильником"
-    group: "Стена B-C"
+    parent: kitchen
     wall: B-C
-    position: 80
+    position: "=portal.position + portal.width"
     width: 1.6
     depth: 64
-    height: 210
+    height: "=portal.height"
     color: "#d8cfc4"
     kitchen: panel
   - id: fridge
     label: "Холодильник AEG"
-    group: "Стена B-C"
+    parent: kitchen
     wall: B-C
     position: 82
     elevation: 2
@@ -146,74 +165,72 @@ objects:
     model: assets/models/aeg-fridge-freezer-bottom-silver.glb
   - id: fridge-top
     label: "Шкаф над холодильником"
-    group: "Стена B-C"
+    parent: upper
     wall: B-C
     position: 81
     elevation: 190
     width: 62
     depth: 64
-    height: 70
     color: "#e9e6df"
     kitchen: true
   - id: portal-shelf
     label: "Полка над порталом"
-    group: "Портал"
+    parent: upper
     wall: B-C
-    position: 0
-    elevation: 210
-    width: 81
+    position: "=portal.position"
+    elevation: "=portal.height"
+    width: "=portal.width + 1"
     depth: 64
-    height: 50
     color: "#b08b5e"
     kitchen: true
   - id: portal
     label: "Портал (арка из реек)"
-    group: "Портал"
     type: portal
     wall: B-C
-    position: 0
+    position: "=door-1.position"
+    width: "=door-1.width"
+    height: 210                        # the one number: door-1, the arch, the panel and the shelf over it follow
     gap: -12
-    width: 80
     depth: 76
-    height: 210
     rails: 8
     rail_width: 5
     rail_thickness: 1
     color: "#b08b5e"
   - id: n-base
     label: "Нижние шкафы (C-D)"
-    group: "Стена C-D"
+    parent: lower
     wall: C-D
     position: 60
     width: 180
-    depth: 60
-    height: 90
-    top: 4
     color: "#d8cfc4"
     kitchen: true
   - id: hob
     label: "Варочная панель"
-    group: "Стена C-D"
+    parent: kitchen
     wall: C-D
     position: 110
     gap: 4.1
-    elevation: 94
+    elevation: "=lower.height + lower.top"      # lies on the worktop
     width: 60
     depth: 52
     height: 1
     color: "#1d1d1d"
   # Bar table instead of the peninsula cabinet (Maxim, 2026-11-08): no carcass, four legs, movable.
-  # Top flush with the worktop (94) and pushed against the C-D worktop front (60 + 2 cm overhang).
-  - id: bar
+  # Saved from the 3D viewer 2026-11-08: 70 x 150, top at 78 (no longer flush with the worktop), 62 cm from the C-D wall
+  # (worktop front 60 + 2 cm overhang), 170 cm from corner C.
+  - id: bar-set
     label: "Барный стол"
-    group: "Барный стол"
+    type: group
+  - id: bar
+    label: "Стол"
+    parent: bar-set
     type: table
     wall: C-D
-    position: 176
+    position: 170
     gap: 62
-    width: 90
+    width: 70
     depth: 150
-    height: 94
+    height: 78
     top: 4
     leg: 5
     color: "#1e1e1e"
@@ -222,10 +239,10 @@ objects:
   # facing the table (east), seat front 10 cm under the table edge.
   - id: stool-1
     label: "Полубарный стул COR Jalis 522 (1)"
-    group: "Барный стол"
+    parent: bar-set
     wall: D-A
     position: 77
-    gap: 231
+    gap: 272.5
     width: 45.2
     depth: 49
     height: 89.9
@@ -233,10 +250,10 @@ objects:
     model: assets/models/cor-jalis-522-counter-stool.glb
   - id: stool-2
     label: "Полубарный стул COR Jalis 522 (2)"
-    group: "Барный стол"
+    parent: bar-set
     wall: D-A
     position: 152
-    gap: 231
+    gap: 274.5
     width: 45.2
     depth: 49
     height: 89.9
@@ -258,8 +275,7 @@ notes: |
     fridge box replaced by the AEG bottom-freezer model (59.5 x 67.2 x 184.5). Both from Maxim's .3ds files.
   2026-11-07: portal = one object (type: portal): П-shaped arch of 6 rail frames 2 x 4 cm over 40 cm depth,
     corner B .. far edge of door-1; replaces the old 'portal-rails' box. Rail count/sizes editable in the viewer.
-  2026-11-07: kitchen palette kitchen_colors (facade / carcass / worktop) for all `kitchen: true` cabinets,
-    editable in the viewer; each cabinet gets a front panel on its room side; bar: on the kitchen side (facade_side: start).
+  2026-11-07: kitchen palette (facade / carcass / worktop) for all `kitchen: true` cabinets, editable in the viewer; each cabinet gets a front panel on its room side; bar: on the kitchen side (facade_side: start).
   2026-11-07: upper cabinets + mezzanine on B-C merged into one wall cabinet e-upper (140-260, 35 deep).
   2026-11-07: 16 mm chipboard divider fridge-panel (94.1-95.7, 67.2 deep, 190 high) between portal and fridge;
     fridge moved 0.75 cm towards the sink (position 96.1).
@@ -273,4 +289,10 @@ notes: |
     to the B-C run stays 116 cm; 94 cm left to wall A-B (route from door-1 to the living part).
     2 COR Jalis 522 counter stools (seat ~65) on the living side. No stool at the south end: seated there,
     the route along A-B would shrink to ~55 cm. No stools on the kitchen side (work aisle).
+  2026-11-08: kitchen = ONE object (type: kitchen) with the palette and two parts, `lower` (height 90, depth 60, worktop 4)
+    and `upper` (top 260 = params.level); cabinets inherit height/depth/top from their part instead of repeating them.
+    The portal's height (210) is the single source for door-1, the arch, the panel beside it and the shelf over it.
+    e-upper was 99.5 high (top 259.5), now follows upper.level = 260 (+0.5 cm).
+  2026-11-08: bar table re-saved from the 3D viewer: 70 x 150, top at 78 (a normal table height, no longer flush with the
+    worktop - so no link to lower.height), 170 cm from corner C; stools moved back to 272.5 / 274.5 cm from wall D-A.
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).

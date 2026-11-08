@@ -30,10 +30,11 @@
   .kcol input[type=color] { width:100%; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; }
   .kcol input.mod { border-color:var(--mod); }
   details.help { margin-top:10px; font-size:11px; color:var(--muted); } details.help summary { cursor:pointer; }
-  #tree .aptsep { margin:10px 6px 4px; padding-top:8px; border-top:1px solid var(--line); }
 
   /* right panel: outliner */
   #treewrap { min-height:0; display:flex; flex-direction:column; }
+  .thead { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .thead h2 { margin:0; } .thead button { padding:2px 8px; font-size:11px; }
   #tree { overflow:auto; max-height:34vh; margin:0 -4px; padding:0 4px; }
   #tree details { margin-bottom:2px; }
   #tree summary { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; cursor:pointer; list-style:none; font-weight:600; font-size:12px; }
@@ -41,6 +42,13 @@
   #tree summary::before { content:'▸'; color:var(--muted); width:10px; }
   #tree details[open] > summary::before { content:'▾'; }
   #tree summary:hover, #tree .item:hover { background:var(--hover); }
+  /* a room is a top-level node; inside it the same folders for every room: walls, openings, objects */
+  #tree > details { margin-bottom:6px; }
+  #tree > details > summary { font-size:13px; }
+  #tree details details { margin-left:10px; }
+  #tree details details > summary { font-weight:500; color:var(--muted); }
+  #tree details details .item { padding-left:18px; }
+  #tree summary.sel { background:var(--accent); color:#fff; } #tree summary.sel .cnt { color:inherit; }
   #tree .cnt { color:var(--muted); font-weight:400; }
   #tree .item { display:flex; align-items:center; gap:7px; padding:4px 6px 4px 22px; border-radius:6px; cursor:pointer; }
   #tree .item.sel { background:var(--accent); color:#fff; }
@@ -118,17 +126,18 @@
   <div class="sec"><span class="lab">Камера</span>
     <div class="seg"><button id="bpersp">Перспектива</button><button id="bortho">Ортогональная</button></div></div>
   <div class="sec"><span class="lab">Показать</span>
-    <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Остальные комнаты квартиры: стены, полы, мебель">Квартира</button></div></div>
-  <div class="sec"><span class="lab">Цвета кухни</span><div class="kcol" id="kcolors"></div></div>
+    <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Показать / скрыть остальные комнаты квартиры (кухня-гостиная остаётся как есть)">Все комнаты</button></div></div>
   <details class="help"><summary>Управление мышью</summary>
     Вращение: левая кнопка / один палец. Сдвиг: правая кнопка / два пальца. Масштаб: колесо / щипок.
     Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
+    Перемещение: второй клик по уже выбранному предмету включает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
+    квадраты между стрелками двигают сразу по двум осям. Шаг 0,5 см, границы те же, что у ползунков, Ctrl+Z отменяет.<br>
     Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</details>
 </div>
 <div id="side" class="panel">
-  <div id="treewrap"><h2>Объекты</h2><div id="tree"></div></div>
+  <div id="treewrap"><div class="thead"><h2>Помещения</h2><button id="bcollapse" title="Свернуть все помещения и папки в дереве">Свернуть все</button></div><div id="tree"></div></div>
   <div id="insp">
-    <div id="empty">Выберите объект в списке или кликните по нему на сцене.</div>
+    <div id="empty">Выберите стену, проём или предмет в списке или кликните по нему на сцене.</div>
     <div id="editor" hidden>
       <div class="ehead"><i id="esw" class="sw"></i>
         <div><div id="etitle"></div><div class="muted" id="esub"></div></div>
@@ -143,7 +152,7 @@
   </div>
 </div>
 <div id="speed"></div>
-<div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Объекты</button></div>
+<div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Помещения</button></div>
 <dialog id="ydlg">
   <textarea id="yaml" readonly></textarea>
   <form method="dialog"><button>Закрыть</button></form>
@@ -151,6 +160,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -162,14 +172,41 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const R = __ROOM_DATA__;
 R.objects ||= [];
 R.models ||= {};
-R.apartment ||= [];                                // other rooms of the flat (apartment.yaml), context around this one
-const aptItems = R.apartment.flatMap(r => r.items);
-const shellId = r => 'room:' + r.id;               // "walls and floor" of an apartment room, one tree row
-const aptIds = R.apartment.flatMap(r => [shellId(r), ...r.items.map(i => i.id)]);
-// one palette for every kitchen cabinet (objects with kitchen: true): fronts, carcass (sides, top, bottom), worktops
-R.kitchen = { facade: '#e9e6df', carcass: '#d8cfc4', worktop: '#6b6259', ...(R.kitchen || {}) };
-const KCOL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
-const kitchenOrig = { ...R.kitchen };
+R.apartment ||= [];                                // the flat's other rooms (apartment.yaml): the same parts as this room
+// ONE model for every room, the kitchen-living room included: a floor, walls, openings and objects. An object stands
+// against a wall of its room (wall + position + gap) and has a width (along the wall), a depth and a height.
+const MAIN = { id: R.id, name: R.name, area_m2: R.area_m2, main: true, objects: R.objects };
+const ROOMS = [MAIN, ...R.apartment];
+ROOMS.forEach(r => r.objects.forEach(o => { o.room = r.id; }));
+const OBJECTS = ROOMS.flatMap(r => r.objects);
+const shellId = r => 'room:' + r.id;               // floor + walls of a room, one eye in the tree
+const aptIds = R.apartment.flatMap(r => [shellId(r), ...r.objects.map(i => i.id)]);   // the rooms that start hidden
+// The walls an object can stand against = the edges of the room's outline: "A-B" runs from corner A to corner B
+// (the kitchen: its own walls from the YAML; the others: `floor` in the order given in apartment.yaml).
+function outlineEdges(pts) {
+  const n = pts.length, ch = i => String.fromCharCode(65 + i % n);
+  const ccw = pts.reduce((s, p, i) => s + p[0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * p[1], 0) > 0;
+  return pts.map((a, i) => {
+    const b = pts[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]), dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L;
+    return { id: `${ch(i)}-${ch(i + 1)}`, a, b, L, dx, dy, nx: ccw ? dy : -dy, ny: ccw ? -dx : dx };   // n = outward normal
+  });
+}
+R.apartment.forEach(r => { r.edges = outlineEdges(r.floor); });
+MAIN.edges = R.walls;                              // filled in below (direction, outward normal) like the others
+const roomById = id => ROOMS.find(r => r.id === id);
+const edgeOf = it => roomById(it.room).edges.find(e => e.id === it.wall);
+// ---------- containers, inheritance, links (tools/room3d/README.md) ----------
+// An object's `def` is what the YAML says per field: a number, an "=expression" (a link) or nothing; the resolved number
+// is it[k] and everything else reads that. Nothing set -> the field is inherited along the `parent` chain, else a default.
+const INHERIT = ['height', 'depth', 'elevation', 'gap', 'top'];
+const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, gap: 0 };
+const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a container: no geometry, holds sizes and the palette
+// the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
+const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
+const palOf = o => {
+  const k = roomById(o.room).objects.find(x => x.type === 'kitchen');
+  return { facade: '#e9e6df', carcass: '#d8cfc4', worktop: '#6b6259', ...Object.fromEntries(PAL.map(([c]) => [c, k?.[c]]).filter(([, v]) => v)) };
+};
 const S = 0.01;                                    // cm -> m
 const P = (x, y, z = 0) => new THREE.Vector3(x * S, z * S, -y * S);   // plan (x east, y north, z up)
 const btn = id => document.getElementById(id);
@@ -179,7 +216,7 @@ const clamp = (v, a, b) => Math.min(Math.max(v, a), Math.max(a, b));
 
 btn('title').textContent = R.name;
 btn('meta').textContent =
-  `${R.area_m2 ? R.area_m2 + ' м² · ' : ''}потолок ${R.ceiling} см · ${R.furniture.length + R.builtins.length + R.objects.length} предметов`;
+  `${R.area_m2 ? R.area_m2 + ' м² · ' : ''}потолок ${R.ceiling} см · ${R.furniture.length + R.builtins.length + R.objects.filter(o => !isGroup(o)).length} предметов`;
 
 const host = btn('c');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -201,7 +238,9 @@ scene.background = new THREE.Color(dark ? 0x1c1d1f : 0xf4f1ec);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = .5;
 const persp = new THREE.PerspectiveCamera(45, 1, 0.05, 200);   // near is adjusted to the zoom every frame
-const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.05, 200);
+// orthographic zoom never moves the camera, so a near plane in front of it would slice the room whenever the camera sits close
+// to the scene (e.g. after zooming in with the perspective camera and switching): the near plane is put behind the camera instead
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
 
 // ---------- viewer settings (camera, toggles, selection, hidden objects) restored from localStorage ----------
 const UKEY = 'planner:ui:' + R.name;
@@ -216,22 +255,51 @@ const hid = new Set(ui.hidden || []);              // hidden object ids
 // apartment rooms start hidden (only this room is being designed): a room this browser has not seen yet is hidden,
 // a new item follows its room (added to apartment.yaml later, it shows up wherever its room is shown)
 const seenApt = new Set(ui.seen || []);
+const collapsed = new Set(ui.collapsed || []);     // collapsed tree nodes: a room's id, or "<room id>/<folder>"
 R.apartment.forEach(r => {
-  if (!seenApt.has(shellId(r))) hid.add(shellId(r));
-  r.items.forEach(i => { if (!seenApt.has(i.id) && hid.has(shellId(r))) hid.add(i.id); });
+  if (!seenApt.has(shellId(r))) { hid.add(shellId(r)); collapsed.add(r.id); }
+  r.objects.forEach(i => { if (!seenApt.has(i.id) && hid.has(shellId(r))) hid.add(i.id); });
 });
-const collapsed = new Set(ui.collapsed || R.apartment.map(r => r.name));     // collapsed tree groups
 // ---------- walls as tree rows: every wall (this room's and each apartment wall/glass box) has its own cutaway setting ----------
 // cutaway on (default): the wall disappears while the camera looks at it from outside; off ("solid"): always visible, from both sides
-const aptWallRows = r => [
-  ...r.walls.map((b, k) => {
-    const z0 = b.length > 4 ? b[4] : 0, z1 = b.length > 4 ? b[5] : R.ceiling;
-    const kind = z0 > 0 ? 'Перемычка' : z1 < R.ceiling ? 'Низкая стенка' : 'Стена';
-    return { id: `${r.id}:w${k}`, label: `${kind} ${k + 1} · ${Math.round(Math.abs(b[2] - b[0]))}×${Math.round(Math.abs(b[3] - b[1]))}`, wallOf: r, color: '#f3f0ea' };
-  }),
-  ...r.glass.map((b, k) => ({ id: `${r.id}:g${k}`, label: `Стекло ${k + 1} · ${Math.round(Math.max(Math.abs(b[2] - b[0]), Math.abs(b[3] - b[1])))}`, wallOf: r, color: '#9fd0ef' })),
-];
-const WALLS = [...R.walls.map(w => ({ id: 'w:' + w.id, label: 'Стена ' + w.id, w, color: '#f3f0ea' })), ...R.apartment.flatMap(aptWallRows)];
+// An apartment wall is drawn as several boxes (posts + lintel of a door, wall under / over a window, its glass);
+// boxes of one physical wall become one object, like a kitchen wall with its openings: same extent across the wall
+// (thickness, ±2 cm) and touching along it. Glass joins the wall it sits in.
+function aptWallGroups(r) {
+  const span2 = (a, b) => [Math.min(a, b), Math.max(a, b)], len = s => s[1] - s[0];
+  const parts = [...r.walls.map((b, k) => ({ b, k, glass: false, z0: b.length > 4 ? b[4] : 0, z1: b.length > 4 ? b[5] : R.ceiling })),
+                 ...r.glass.map((b, k) => ({ b, k, glass: true, z0: b[4], z1: b[5] }))];
+  parts.forEach(p => { p.x = span2(p.b[0], p.b[2]); p.y = span2(p.b[1], p.b[3]); });
+  const same = (a, b) => Math.abs(a[0] - b[0]) <= 2 && Math.abs(a[1] - b[1]) <= 2;
+  const inside = (a, b) => a[0] >= b[0] - 1 && a[1] <= b[1] + 1;
+  const touch = (a, b) => a[0] <= b[1] + 1 && b[0] <= a[1] + 1;
+  const joined = (p, q) => {
+    if (p.glass && q.glass) return false;
+    if (p.glass || q.glass) {                                   // glass: inside the wall's thickness, the wall runs the same way
+      const [g, w] = p.glass ? [p, q] : [q, p];
+      return len(g.x) < len(g.y) ? inside(g.x, w.x) && touch(g.y, w.y) && len(w.y) >= len(w.x)
+                                 : inside(g.y, w.y) && touch(g.x, w.x) && len(w.x) >= len(w.y);
+    }
+    return same(p.x, q.x) && touch(p.y, q.y) || same(p.y, q.y) && touch(p.x, q.x);
+  };
+  const up = parts.map((_, i) => i), find = i => up[i] === i ? i : (up[i] = find(up[i]));
+  parts.forEach((p, i) => parts.forEach((q, j) => { if (j > i && joined(p, q)) up[find(j)] = find(i); }));
+  const groups = new Map();
+  parts.forEach((p, i) => { const g = find(i); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); });
+  return [...groups.values()].map((ps, n) => {
+    const x = [Math.min(...ps.map(p => p.x[0])), Math.max(...ps.map(p => p.x[1]))];
+    const y = [Math.min(...ps.map(p => p.y[0])), Math.max(...ps.map(p => p.y[1]))];
+    const walls = ps.filter(p => !p.glass), full = walls.some(p => p.z0 <= 0 && p.z1 >= R.ceiling);
+    const kind = !walls.length ? 'Стекло' : full ? (ps.length > 1 ? 'Стена с проёмом' : 'Стена')
+      : ps.some(p => p.glass) ? 'Остекление' : walls.every(p => p.z0 > 0) ? 'Перемычка' : 'Низкая стенка';
+    const first = walls[0] || ps[0];
+    return { id: `${r.id}:${first.glass ? 'g' : 'w'}${first.k}`, label: `${kind} ${n + 1} · ${Math.round(Math.max(len(x), len(y)))} см`,
+      wallOf: r, color: walls.length ? '#f3f0ea' : '#9fd0ef', parts: ps, c: [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2],
+      ax: len(x) < len(y) ? 'x' : 'y' };                     // thin axis: the wall's normal runs along it
+  });
+}
+R.apartment.forEach(r => { r.wallGroups = aptWallGroups(r); });
+const WALLS = [...R.walls.map(w => ({ id: 'w:' + w.id, label: 'Стена ' + w.id, w, wallOf: MAIN, color: '#f3f0ea' })), ...R.apartment.flatMap(r => r.wallGroups)];
 const wallRow = id => WALLS.find(x => x.id === id);
 const solid = new Set(ui.solid || (ui.cutaway === false ? WALLS.map(x => x.id) : []));   // ids of walls without cutaway (old global switch carried over)
 let saveTimer;
@@ -251,47 +319,81 @@ function saveUi() {                                // debounced: camera 'change'
 // ---------- items: openings (windows/doors) and free boxes share one edit mechanism ----------
 // shortcut: no backend, so edits never reach rooms/*.yaml by themselves; "Просмотреть YAML" shows what to paste.
 // An edit is dropped if the YAML value it was made against has changed since (YAML wins).
-R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; });
+R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill'],
-  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'],   // rails*: type portal, leg: type table
-  box: ['x', 'y', 'sx', 'sy', 'height', 'elevation'] };                                                                  // apartment items
-const kindOf = it => it.kind ? 'hole' : it.room ? 'box' : 'object';
-const all = () => [...R.holes, ...R.objects, ...aptItems];
-const roomById = id => R.apartment.find(r => r.id === id);
+  object: ['position', 'gap', 'elevation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg'] };   // rails*: type portal, leg: type table
+const kindOf = it => it.kind ? 'hole' : 'object';
+const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
-const wallById = id => R.walls.find(w => w.id === id);
-const pick = it => Object.fromEntries(KEYS[kindOf(it)].map(k => [k, it[k]]));
+const underSel = o => { for (let x = o; x; x = x.parent && byId(x.parent)) if (x.id === sel) return true; return false; };   // the selected item or a container above it
+const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...Object.keys(it.params || {})];
+all().forEach(it => {
+  it.def = {};
+  keysOf(it).forEach(k => { const v = it.params?.[k] ? it.params[k].value : it[k]; if (v != null) it.def[k] = v; });
+});
+// "=expression": a bare name is a property of the object the formula ends up on, `id.name` of another object / opening.
+// Operators + - * / ( ), spaces around a minus (ids contain hyphens). A cycle or an unknown name is reported in the editor.
+function resolveAll() {
+  const memo = new Map(), busy = new Set();
+  const get = (it, k) => {
+    const mk = it.id + '.' + k;
+    if (memo.has(mk)) return memo.get(mk);
+    if (busy.has(mk)) throw Error('ссылки идут по кругу: ' + mk);
+    busy.add(mk);
+    let src = it, v = it.def[k];
+    while (v === undefined && INHERIT.includes(k) && src.parent && byId(src.parent)) { src = byId(src.parent); v = src.def[k]; }
+    const link = typeof v === 'string' && v[0] === '=', inherited = src !== it && v !== undefined;
+    it.link[k] = link || inherited ? { expr: link ? v : undefined, from: inherited ? src.id : undefined } : undefined;
+    if (link) v = evalLink(v.slice(1), it);
+    if (v === undefined) v = DEFAULTS[k];
+    busy.delete(mk); memo.set(mk, v);
+    return v;
+  };
+  const evalLink = (src, self) => {
+    const e = src.replace(/([A-Za-z_][\w-]*)(?:\.([A-Za-z_]\w*))?/g, (m, a, b) => {
+      const it = b ? byId(a) : self, v = it && get(it, b || a);
+      if (!it) throw Error('нет объекта ' + a);
+      if (typeof v !== 'number' || isNaN(v)) throw Error(m + ' — не число');
+      return `(${v})`;
+    });
+    if (!/^[\d\s.+\-*/()e]*$/.test(e)) throw Error('недопустимая формула: ' + src);
+    return Function(`return ${e}`)();
+  };
+  all().forEach(it => { it.link = {}; it.err = null; });
+  all().forEach(it => keysOf(it).forEach(k => {
+    try { const v = get(it, k); if (v !== undefined) it[k] = v; else delete it[k]; }
+    catch (e) { busy.clear(); it.err = e.message; console.error(it.id + '.' + k, e.message); it[k] = DEFAULTS[k] ?? 0; }
+  }));
+}
+resolveAll();
+const pick = it => structuredClone(it.def);
 const origById = Object.fromEntries(all().map(i => [i.id, structuredClone(i)]));
 const KEY = 'planner:' + R.name;
 try {
   Object.entries(JSON.parse(localStorage.getItem(KEY) || '{}')).forEach(([id, rec]) => {
-    if (id === '__kitchen') {                        // palette edits: same rule, dropped once the YAML palette changes
-      if (JSON.stringify(rec.b) === JSON.stringify(kitchenOrig)) Object.assign(R.kitchen, rec.v);
-      return;
-    }
     const it = byId(id);
-    if (it && JSON.stringify(rec.b) === JSON.stringify(pick(origById[id]))) Object.assign(it, pick(rec.v));
+    if (it && JSON.stringify(rec.b) === JSON.stringify(pick(origById[id]))) it.def = structuredClone(rec.v);   // YAML changed since: the edit is dropped
   });
 } catch { /* storage blocked: start from the YAML values */ }
+resolveAll();
 const saveEdits = () => {
-  try {
-    localStorage.setItem(KEY, JSON.stringify({ ...Object.fromEntries(all().map(i => [i.id, { v: pick(i), b: pick(origById[i.id]) }])),
-      __kitchen: { v: R.kitchen, b: kitchenOrig } }));
-  }
+  try { localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(all().map(i => [i.id, { v: pick(i), b: pick(origById[i.id]) }])))); }
   catch { /* not persisted */ }
 };
 
 // Everything stands on a wall: `position`/`width` run along it, `gap`+`depth` go from it into the room, so a
 // change of any size can never detach an item from its wall. Limits are shared with the sliders (rangeOf).
-const perpOf = w => Math.abs(w.dx) > .5 ? maxY - minY : maxX - minX;          // room size across that wall (rectangular room)
+const perpOf = (room, w) => {                      // room size across that wall (its bounding box)
+  const xs = room.edges.map(e => e.a[0]), ys = room.edges.map(e => e.a[1]);
+  return Math.abs(w.dx) > .5 ? Math.max(...ys) - Math.min(...ys) : Math.max(...xs) - Math.min(...xs);
+};
 const rangeOf = (it, k) => {
-  if (it.room) return ({                           // apartment item: anywhere inside the flat's outline
-    x: [aMinX, aMaxX - it.sx], y: [aMinY, aMaxY - it.sy], sx: [1, aMaxX - aMinX], sy: [1, aMaxY - aMinY],
-    height: [1, H - it.elevation], elevation: [0, H - it.height] })[k];
-  const w = wallById(it.wall), L = w.L, perp = perpOf(w);
+  if (!it.wall) return [0, 1000];                  // a container has no wall
+  const w = edgeOf(it), L = w.L, perp = perpOf(roomById(it.room), w);
   return ({
     position: [0, L - it.width], width: [it.kind ? 10 : 1, L], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
-    sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap], gap: [-20, perp - it.depth], top: [0, 10],   // gap < 0: sunk into the wall (a niche)
+    sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap],
+    gap: [-(it.depth + 40), perp - it.depth], top: [0, 10],   // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
     rails: [1, 40], rail_width: [.5, it.depth / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
     leg: [1, Math.min(it.width, it.depth) / 2],
   })[k];
@@ -299,7 +401,7 @@ const rangeOf = (it, k) => {
 // ---------- undo / redo of document changes (item sizes and positions, hidden objects; not the camera) ----------
 const undo = [], redo = [];
 let lastEdit = { key: '', t: 0 };
-const snap = () => JSON.stringify({ v: Object.fromEntries(all().map(i => [i.id, pick(i)])), h: [...hid], k: R.kitchen, s: [...solid] });
+const snap = () => JSON.stringify({ v: Object.fromEntries(all().map(i => [i.id, pick(i)])), h: [...hid], s: [...solid] });
 const syncHist = () => { btn('bundo').disabled = !undo.length; btn('bredo').disabled = !redo.length; };
 function record(key = '') {                         // call BEFORE changing the data
   const now = Date.now();
@@ -310,21 +412,28 @@ function record(key = '') {                         // call BEFORE changing the 
 function step(from, to) {
   if (!from.length) return;
   to.push(snap());
-  const { v, h, k, s } = JSON.parse(from.pop());
-  all().forEach(i => Object.assign(i, v[i.id]));
+  const { v, h, s } = JSON.parse(from.pop());
+  all().forEach(i => { i.def = v[i.id]; });
+  resolveAll();
   hid.clear(); h.forEach(id => hid.add(id));
   if (s) { solid.clear(); s.forEach(id => solid.add(id)); }
-  if (k) Object.assign(R.kitchen, k);
-  lastEdit = { key: '', t: 0 }; syncHist(); syncKitchen();
+  lastEdit = { key: '', t: 0 }; syncHist();
   saveEdits(); build(); renderTree(); renderEditor(); refresh(); saveUi();
 }
 
+// patch = { field: value }: a field set by hand replaces its link / inheritance by the number; the edited fields are limited
+// first, the others (own numbers only) then give way (e.g. a wider item moves along the wall)
+function applyPatch(it, patch) {
+  Object.assign(it.def, patch); resolveAll();
+  const ks = Object.keys(patch);
+  [...ks, ...KEYS[kindOf(it)].filter(x => !ks.includes(x))].forEach(key => {
+    if (typeof it.def[key] === 'number') it.def[key] = it[key] = clamp(it.def[key], ...rangeOf(it, key));
+  });
+  resolveAll(); saveEdits(); build(); refresh();
+}
 function setField(it, k, v) {
   record(it.id + '.' + k);
-  it[k] = k === 'rails' ? Math.round(v) : v;
-  // the edited field is limited first, the others then give way (e.g. a wider item moves along the wall)
-  [k, ...KEYS[kindOf(it)].filter(x => x !== k)].forEach(key => { if (it[key] != null) it[key] = clamp(it[key], ...rangeOf(it, key)); });
-  saveEdits(); build(); refresh();
+  applyPatch(it, { [k]: k === 'rails' ? Math.round(v) : v });
 }
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f72, .5));
@@ -377,6 +486,8 @@ const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xf3f0ea, roughnes
 const wallGroups = [], pickables = [], aptWalls = [];
 const root = new THREE.Group(); scene.add(root);   // walls, openings, objects: rebuilt on every edit
 function clearRoot() {
+  // CSS2DRenderer only drops the DOM label of an object removed directly from its parent, not of one inside a removed group
+  root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
   root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); o.material?.dispose(); } });   // model meshes are reused
   root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0;
 }
@@ -404,7 +515,11 @@ R.walls.forEach((w, i) => {
 
 function build() {
   clearRoot();
+  const showMain = !hid.has(shellId(MAIN));          // floor + walls + openings of this room; its objects have their own eyes
+  floor.visible = showMain;
+  if (showMain) buildRoomLabels(MAIN);
   R.walls.forEach((w, i) => {
+    if (!showMain) return;
     const prev = R.walls[(i - 1 + N) % N], next = R.walls[(i + 1) % N];
     const turn = (a, b) => (a.dx * b.dy - a.dy * b.dx) * (ccw ? 1 : -1);  // >0 convex
     const L = w.L;
@@ -470,17 +585,17 @@ function build() {
     });
   });
 
-  // objects[] of the room YAML: boxes standing on a wall (position/width along it, gap+depth into the room).
+  // objects[] of every room (same format everywhere): standing on a wall (position/width along it, gap+depth into the room).
   // A label only on the selected one, to keep the scene readable.
-  R.objects.forEach(o => {
-    const w = wallById(o.wall);
+  ROOMS.forEach(room => room.objects.forEach(o => {
+    const w = edgeOf(o);
     if (!w || hid.has(o.id)) return;
-    const picked = o.id === sel;
+    const picked = underSel(o);
     if (o.type === 'portal') return placePortal(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
     if (o.model && models[o.model]) return placeModel(o, w, picked);
     // other objects that ask for a cut-out in this one (a sink in the worktop): rectangles in wall coordinates
-    const cuts = R.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id)).map(c => ({
+    const cuts = room.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id)).map(c => ({
       u: c.position + c.width / 2, t: c.gap + c.depth / 2, w: +c.cutout.width || c.width - 4, d: +c.cutout.depth || c.depth - 4 }));
     const box = (depth, z, h, color, rough = .6) => {
       const u = o.position + o.width / 2, t = o.gap + depth / 2;                 // inward = -outward normal
@@ -512,8 +627,9 @@ function build() {
       m.add(edges); root.add(m); pickables.push(m);
       return m;
     };
-    const body = box(o.depth, o.elevation, o.height, o.kitchen ? R.kitchen.carcass : o.color);
-    if (o.top) box(o.depth + 2, o.elevation + o.height, o.top, R.kitchen.worktop, .3);   // countertop, 2 cm front overhang
+    const pal = palOf(o);
+    const body = box(o.depth, o.elevation, o.height, o.kitchen ? pal.carcass : o.color);
+    if (o.top) box(o.depth + 2, o.elevation + o.height, o.top, pal.worktop, .3);   // countertop, 2 cm front overhang
     if (o.kitchen === true) {                        // kitchen: panel = a plain board in the carcass colour, no front
       // front panel (1.8 cm), 2 mm smaller than the body all round, so a thin carcass edge shows, 1 mm proud of it.
       // facade_side: front (default, the room side) | start / end (the side facing the wall's first / second corner,
@@ -521,7 +637,7 @@ function build() {
       const side = o.facade_side || 'front', across = side !== 'front';
       const g = across ? new THREE.BoxGeometry(1.8 * S, (o.height - .4) * S, (o.depth - .4) * S)
                        : new THREE.BoxGeometry((o.width - .4) * S, (o.height - .4) * S, 1.8 * S);
-      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: R.kitchen.facade, roughness: .45 }));
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: pal.facade, roughness: .45 }));
       const u = side === 'start' ? o.position + .8 : side === 'end' ? o.position + o.width - .8 : o.position + o.width / 2;
       const t = across ? o.gap + o.depth / 2 : o.gap + o.depth - .8;
       m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
@@ -529,15 +645,26 @@ function build() {
       m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
       root.add(m); pickables.push(m);
     }
-    if (picked) {
+    if (o.id === sel) {
       const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
       l.position.set(0, (o.height + (o.top || 0)) * S / 2 + .08, 0); body.add(l);
     }
-  });
-  R.apartment.forEach(buildAptRoom);
+  }));
+  R.apartment.forEach(buildRoomShell);
 }
 
-// ---------- the rest of the flat (apartment.yaml): floors, wall boxes, glass, furniture boxes ----------
+// room name + area in the middle and the corner letters (A, B, C...) just outside each corner: the same for every room
+function buildRoomLabels(room) {
+  const xs = room.edges.map(e => e.a[0]), ys = room.edges.map(e => e.a[1]);
+  addLabel(`${room.name}${room.area_m2 ? ' · ' + room.area_m2 + ' м²' : ''}`,
+    P((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, 3), '', root);
+  room.edges.forEach((w, i) => {
+    const prev = room.edges[(i - 1 + room.edges.length) % room.edges.length];
+    addLabel(w.id.split('-')[0], P(w.a[0] + (w.nx + prev.nx) * 30, w.a[1] + (w.ny + prev.ny) * 30, H + 5), 'dim', root);
+  });
+}
+
+// ---------- shell (floor, wall boxes, glass) of the flat's other rooms (apartment.yaml); their objects are built above ----------
 // Plan boxes are [x0, y0, x1, y1] (+ [z0, z1]) in this room's frame. Walls do not cast shadows, so showing
 // the flat never darkens the room being designed; they take part in the cutaway (updateWalls).
 // orange outline of the selected wall, drawn on top
@@ -552,39 +679,25 @@ const planBox = (b, z0, z1, mat) => {
   m.userData.c = [(x0 + x1) / 2, (y0 + y1) / 2];
   return m;
 };
-function buildAptRoom(r) {
+function buildRoomShell(r) {
   if (!hid.has(shellId(r))) {
     const fl = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))),
       new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
     fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
     const wm = wallMat();
-    const wallBox = (m, id) => { m.userData.id = id; root.add(m); aptWalls.push(m); pickables.push(m); if (id === sel) outline(m); };
-    r.walls.forEach((b, k) => {
-      const m = planBox(b, b.length > 4 ? b[4] : 0, b.length > 4 ? b[5] : H, wm);
-      m.receiveShadow = true; wallBox(m, `${r.id}:w${k}`);
-      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
-    });
     const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
-    r.glass.forEach((b, k) => wallBox(planBox(b, b[4], b[5], gm), `${r.id}:g${k}`));
-    const xs = r.floor.map(p => p[0]), ys = r.floor.map(p => p[1]);
-    addLabel(`${r.name}${r.area_m2 ? ' · ' + r.area_m2 + ' м²' : ''}`,
-      P((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2, 3), '', root);
+    // one wall = several boxes with one id and one centre: selected, outlined and cut away together
+    r.wallGroups.forEach(g => g.parts.forEach(p => {
+      const m = planBox(p.b, p.z0, p.z1, p.glass ? gm : wm);
+      Object.assign(m.userData, { id: g.id, c: g.c, ax: g.ax }); root.add(m); aptWalls.push(m); pickables.push(m);
+      if (!p.glass) {
+        m.receiveShadow = true;
+        m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
+      }
+      if (g.id === sel) outline(m);
+    }));
+    buildRoomLabels(r);
   }
-  r.items.forEach(i => {
-    if (hid.has(i.id)) return;
-    const picked = i.id === sel;
-    const m = planBox([i.x, i.y, i.x + i.sx, i.y + i.sy], i.elevation, i.elevation + i.height,
-      new THREE.MeshStandardMaterial({ color: i.color, roughness: .6 }));
-    m.castShadow = m.receiveShadow = true; m.userData.id = i.id;
-    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial(
-      picked ? { color: 0xff7a00, depthTest: false } : { color: 0x000000, transparent: true, opacity: .3 }));
-    if (picked) {
-      edges.renderOrder = 10;
-      const l = makeLabel(`${i.label} · ${r1(i.sx)}×${r1(i.sy)}×${r1(i.height)}`, 'hole');
-      l.position.set(0, i.height * S / 2 + .08, 0); m.add(l);
-    }
-    m.add(edges); root.add(m); pickables.push(m);
-  });
 }
 
 // ---------- 3D models (objects[].model: a .glb embedded by build_room_3d.py) ----------
@@ -627,8 +740,10 @@ function selectionBox(o, w) {
   const u = o.position + o.width / 2, t = o.gap + o.depth / 2;
   e.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
   e.rotation.y = Math.atan2(w.dy, w.dx); e.renderOrder = 10;
-  const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
-  l.position.set(0, o.height * S / 2 + .08, 0); e.add(l);
+  if (o.id === sel) {
+    const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
+    l.position.set(0, o.height * S / 2 + .08, 0); e.add(l);
+  }
   root.add(e);
 }
 
@@ -678,19 +793,13 @@ function placeTable(o, w, picked) {
   };
   const u0 = o.position, u1 = o.position + o.width, t0 = o.gap, t1 = o.gap + o.depth;
   const z0 = o.elevation, z1 = o.elevation + o.height;
-  piece(u0, u1, t0, t1, z1 - th, z1, o.kitchen === true ? R.kitchen.worktop : o.color, .3);
+  piece(u0, u1, t0, t1, z1 - th, z1, o.kitchen === true ? palOf(o).worktop : o.color, .3);
   [[u0 + ins, t0 + ins], [u1 - ins - lg, t0 + ins], [u0 + ins, t1 - ins - lg], [u1 - ins - lg, t1 - ins - lg]]
     .forEach(([u, t]) => piece(u, u + lg, t, t + lg, z0, z1 - th, o.color, .4));
   if (picked) selectionBox(o, w);
 }
 build();
 
-// corner letters (A, B, C...) just outside each corner
-R.walls.forEach((w, i) => {
-  const prev = R.walls[(i - 1 + N) % N];
-  const ox = (w.nx + prev.nx), oy = (w.ny + prev.ny);
-  addLabel(w.id.split('-')[0], P(w.a[0] + ox * 30, w.a[1] + oy * 30, H + 5), 'dim');
-});
 
 // ---------- boxes from bboxes (planhaus built_ins / furniture) ----------
 function prism(bbox, z0, h, color, opts = {}) {
@@ -709,7 +818,7 @@ const centroid = bb => [bb.reduce((s, p) => s + p[0], 0) / bb.length, bb.reduce(
 
 R.builtins.forEach(b => {
   prism(b.bbox, b.elevation, b.height, b.color);
-  if (b.countertop) prism(b.bbox, b.elevation + b.height, 4, R.kitchen.worktop, { rough: .4 });
+  if (b.countertop) prism(b.bbox, b.elevation + b.height, 4, palOf({ room: MAIN.id }).worktop, { rough: .4 });
   const c = centroid(b.bbox);
   addLabel(b.label, P(c[0], c[1], b.elevation + b.height + 10));
   if (b.upper && b.wall) {
@@ -789,7 +898,7 @@ let quiet = false;                                             // true while the
 const quietly = fn => { quiet = true; try { fn(); } finally { quiet = false; } };
 const markView = () => document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === view));
 function useCamera(c) {
-  camera = c; isOrtho = c === ortho; controls.object = c;
+  camera = c; isOrtho = c === ortho; controls.object = c; tc.camera = c;
   gtao.gtaoMaterial.defines.PERSPECTIVE_CAMERA = isOrtho ? 0 : 1; gtao.gtaoMaterial.needsUpdate = true;
   btn('bpersp').classList.toggle('on', !isOrtho); btn('bortho').classList.toggle('on', isOrtho);
 }
@@ -836,13 +945,14 @@ function updateWalls() {
     g.visible = !(!solid.has(wid) && w.nx * camDir.x - w.ny * camDir.z > .2);
     labels.forEach(l => { l.visible = g.visible; });
   });
-  // apartment walls: cut away those standing between the camera and a room-sized box around the orbit target
-  // (looking at the kitchen hides the rooms in front of it; pan to the corridor and it opens up the same way)
-  const dx = camDir.x, dy = -camDir.z, len = Math.hypot(dx, dy);
-  const cut = len > .2, ux = dx / len, uy = dy / len;
+  // apartment walls, same rule as the kitchen's: a wall is cut away while the camera sees it from outside, i.e. it stands
+  // between the orbit target and the camera (across its thin axis) and the camera is not side-on to it (same 0.2 margin)
+  const dx = camDir.x, dy = -camDir.z;                         // camera direction in plan coords
   const tx = controls.target.x / S, ty = -controls.target.z / S;
-  const reach = Math.abs(ux) * (maxX - minX) / 2 + Math.abs(uy) * (maxY - minY) / 2;
-  aptWalls.forEach(m => { m.visible = !(cut && !solid.has(m.userData.id) && (m.userData.c[0] - tx) * ux + (m.userData.c[1] - ty) * uy > reach); });
+  aptWalls.forEach(m => {
+    const { id, c, ax } = m.userData, d = ax === 'x' ? dx : dy, off = ax === 'x' ? c[0] - tx : c[1] - ty;
+    m.visible = solid.has(id) || !(Math.abs(d) > .2 && off * d > 0);
+  });
 }
 
 R.walls.forEach(w => {
@@ -866,24 +976,12 @@ btn('bapt').onclick = () => {
 // ---------- outliner + inspector (right panel) ----------
 const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18 18 0 0 1 5.1-5.9M9.9 4.2A10.7 10.7 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.2 3.2M1 1l22 22"/></svg>';
-const swatch = it => (it.kitchen === 'panel' ? R.kitchen.carcass : it.type === 'table' && it.kitchen ? R.kitchen.worktop : it.kitchen && R.kitchen.facade) || it.color || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
-let inputs = {};
-
-// kitchen palette: three colour pickers in the left panel; a change is one undo step per colour drag
-const kinputs = {};
-KCOL.forEach(([k, label]) => {
-  const inp = el('input'); inp.type = 'color'; inp.title = label;
-  inp.oninput = () => {
-    record('kitchen.' + k); R.kitchen[k] = inp.value;
-    saveEdits(); build(); renderTree(); renderEditor(); syncKitchen();
-  };
-  const l = el('label'); l.append(inp, el('span', '', label));
-  btn('kcolors').append(l); kinputs[k] = inp;
-});
-function syncKitchen() {
-  KCOL.forEach(([k]) => { kinputs[k].value = R.kitchen[k]; kinputs[k].classList.toggle('mod', R.kitchen[k] !== kitchenOrig[k]); });
-  btn('yaml').value = yamlText();
-}
+const swatch = it => {
+  const p = it.room && !it.kind ? palOf(it) : {};
+  return (it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
+    || it.color || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
+};
+let inputs = {}, cinputs = {};
 
 function eye(off, fn) {
   const b = el('button', 'eye'); b.innerHTML = off ? EYE_OFF : EYE; b.title = off ? 'Показать' : 'Скрыть'; b.onclick = fn;
@@ -898,9 +996,10 @@ function cutBtn(cut, fn) {
   return b;
 }
 function setSolid(ids, on) { record(); ids.forEach(id => on ? solid.add(id) : solid.delete(id)); renderTree(); renderEditor(); saveUi(); }
-function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); saveUi(); }
+function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); syncGizmo(); saveUi(); }
 function select(id) {
-  sel = id; build(); renderTree(); renderEditor(); saveUi();
+  if (id !== sel) gizmoOn = false;                  // the move gizmo belongs to one selected item
+  sel = id; build(); renderTree(); renderEditor(); syncGizmo(); saveUi();   // renderEditor() returns early with no item, so sync here too
   if (phone.matches) sheet('side', !!id);          // phone: a tap on an object opens its editor, a tap on empty space closes the sheet
 }
 
@@ -915,54 +1014,85 @@ function sheet(name, open) {                       // open: true / false, or und
 }
 document.querySelectorAll('#mbar button').forEach(b => b.onclick = () => sheet(b.dataset.sheet));
 
+// Every room is the same tree node: its eye hides the whole room (floor, walls, objects); inside it the same folders -
+// «Стены» (floor + walls: scissors = cutaway, eye = floor and walls only), «Проёмы» (windows / doors cut in its walls),
+// then its objects, in the folders named by `group` (no group: «Объекты»).
+const treeKeys = [];                                           // every collapsible node of the tree, filled by renderTree
+btn('bcollapse').onclick = () => { treeKeys.forEach(k => collapsed.add(k)); renderTree(); saveUi(); };
 function renderTree() {
   const tree = btn('tree'); tree.replaceChildren();
-  const kWalls = WALLS.filter(x => x.w);
-  const groups = new Map([['Стены', kWalls], ['Проёмы', R.holes]]);
-  R.objects.forEach(o => { if (!groups.has(o.group)) groups.set(o.group, []); groups.get(o.group).push(o); });
-  // other rooms: one group each, "walls and floor" first (eye only: hides the whole shell), its wall boxes, then the furniture
-  R.apartment.forEach(r => groups.set(r.name,
-    [{ id: shellId(r), label: 'Стены и пол', shell: true, color: r.floor_color || '#8b7560' }, ...WALLS.filter(x => x.wallOf === r), ...r.items]));
   btn('bapt').classList.toggle('on', !aptIds.every(id => hid.has(id)));
-  groups.forEach((list, name) => {
-    if (R.apartment.length && name === R.apartment[0].name) tree.append(el('h2', 'aptsep', 'Квартира'));
-    const hideable = list !== R.holes && list !== kWalls, ids = list.filter(o => !wallRow(o.id)).map(o => o.id);
-    const wids = list.filter(o => wallRow(o.id)).map(o => o.id);
-    const d = el('details'); d.open = !collapsed.has(name);
-    d.ontoggle = () => { d.open ? collapsed.delete(name) : collapsed.add(name); saveUi(); };
-    const s = el('summary'); s.append(el('span', '', name), el('span', 'cnt', String(list.length)));
-    if (wids.length) {                                       // one click: cutaway on / off for every wall of the group
-      const allCut = wids.every(id => !solid.has(id));
-      s.append(cutBtn(allCut, e => { e.preventDefault(); e.stopPropagation(); setSolid(wids, allCut); }));
-    }
-    if (hideable) {
-      const allOff = ids.every(id => hid.has(id));
-      const b = eye(allOff, e => { e.preventDefault(); e.stopPropagation(); setHidden(ids, !allOff); });
-      if (wids.length) b.style.marginLeft = '0';                // both icons together at the right edge
-      s.append(b);
-    }
+  treeKeys.length = 0;
+  const node = (key, title, count) => {                       // a collapsible tree node, remembered in `collapsed`
+    treeKeys.push(key);
+    const d = el('details'); d.open = !collapsed.has(key);
+    d.ontoggle = () => { d.open ? collapsed.delete(key) : collapsed.add(key); saveUi(); };
+    const s = el('summary'); s.append(el('span', '', title), el('span', 'cnt', String(count)));
     d.append(s);
-    list.forEach(it => {
-      const isWall = !!wallRow(it.id), off = hid.has(it.id) || (it.wallOf && hid.has(shellId(it.wallOf)));
+    return [d, s];
+  };
+  const stop = fn => e => { e.preventDefault(); e.stopPropagation(); fn(); };
+  ROOMS.forEach(room => {
+    const folders = new Map([['Стены', { list: WALLS.filter(x => x.wallOf === room), shell: true }]]);
+    if (room.main && R.holes.length) folders.set('Проёмы', { list: R.holes, fixed: true });
+    const roomIds = [shellId(room), ...room.objects.map(o => o.id)], shellOff = hid.has(shellId(room));
+    const [rd, rs] = node(room.id, room.name, room.objects.filter(o => !isGroup(o)).length);
+    const allOff = roomIds.every(id => hid.has(id));
+    rs.append(eye(allOff, stop(() => setHidden(roomIds, !allOff))));
+    const row = (it, fixed) => {
+      const isWall = !!wallRow(it.id), off = hid.has(it.id) || (it.wallOf && hid.has(shellId(it.wallOf))) || (it.kind && shellOff);
       const r = el('div', 'item' + (it.id === sel ? ' sel' : '') + (off ? ' off' : ''));
       const sw = el('i', 'sw'); sw.style.background = swatch(it);
       r.append(sw, el('span', 'nm', it.label));
       if (isWall) r.append(cutBtn(!solid.has(it.id), e => { e.stopPropagation(); setSolid([it.id], !solid.has(it.id)); }));
-      else if (hideable) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
-      r.onclick = it.shell ? () => setHidden([it.id], !hid.has(it.id)) : () => select(it.id);
-      d.append(r);
+      else if (!fixed) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
+      r.onclick = () => select(it.id);
+      return r;
+    };
+    folders.forEach((f, name) => {
+      const wids = f.list.filter(o => wallRow(o.id)).map(o => o.id);
+      const [d, s] = node(room.id + '/' + name, name, f.list.length);
+      if (wids.length) {                                      // one click: cutaway on / off for every wall of the room
+        const allCut = wids.every(id => !solid.has(id));
+        s.append(cutBtn(allCut, stop(() => setSolid(wids, allCut))));
+      }
+      if (f.shell) {                                          // floor + walls only, the objects stay
+        const b = eye(shellOff, stop(() => setHidden([shellId(room)], !shellOff)));
+        if (wids.length) b.style.marginLeft = '0';            // both icons together at the right edge
+        s.append(b);
+      }
+      f.list.forEach(it => d.append(row(it, f.fixed)));
+      rd.append(d);
     });
-    tree.append(d);
+    // objects: a container (type: group / kitchen) is a tree node with its children inside, an object without a parent
+    // stands directly in the room; a click on a container's name selects it and folds / unfolds it
+    const kids = pid => room.objects.filter(o => (o.parent || null) === pid);
+    const leaves = o => isGroup(o) ? kids(o.id).flatMap(leaves) : [o];
+    const addObj = (into, o) => {
+      if (!isGroup(o)) return into.append(row(o));
+      const ids = leaves(o).map(x => x.id), key = room.id + '/' + o.id, [d, s] = node(key, o.label, ids.length);
+      s.classList.toggle('sel', o.id === sel);
+      s.addEventListener('click', e => {
+        if (e.target.closest('.eye')) return;
+        e.preventDefault(); collapsed.has(key) ? collapsed.delete(key) : collapsed.add(key); select(o.id);
+      });
+      const off = ids.length > 0 && ids.every(id => hid.has(id));
+      s.append(eye(off, stop(() => setHidden(ids, !off))));
+      kids(o.id).forEach(c => addObj(d, c));
+      into.append(d);
+    };
+    kids(null).forEach(o => addObj(rd, o));
+    tree.append(rd);
   });
 }
 
-// width = the front side (along the wall the object stands against), depth = away from that wall
-const sections = it => it.room ? [
-  ['Положение (от угла A кухни)', [['x', 'X — вдоль стены A-B'], ['y', 'Y — вдоль стены B-C'], ['elevation', 'Высота от пола']]],
-  ['Размер', [['sx', 'По X (вдоль A-B)'], ['sy', 'По Y (вдоль B-C)'], ['height', 'Высота']]],
-] : it.kind ? [
+// width = along the wall the object stands against, depth = away from that wall, height = up: the same for every object
+const LABELS = { height: 'Высота', depth: 'Глубина', top: 'Столешница', elevation: 'Высота от пола', gap: 'Отступ от стены' };
+const sections = it => it.kind ? [
   ['Положение', [['position', `От угла ${it.wall.split('-')[0]}`]]],
   ['Размер', [['width', 'Ширина'], ['height', 'Высота'], ...(it.kind === 'window' ? [['sill', 'Подоконник от пола']] : [])]],
+] : isGroup(it) ? [
+  ['Задано для вложенных объектов', Object.keys(it.def).filter(k => !PAL.some(([c]) => c === k)).map(k => [k, LABELS[k] || it.params[k]?.label || k])],
 ] : [
   ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола']]],
   ['Размер', [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
@@ -976,7 +1106,7 @@ function renderEditor() {
   if (!it) return;
   if (wr) {                                                   // a wall: only its cutaway setting
     btn('esw').style.background = wr.color; btn('etitle').textContent = wr.label;
-    btn('esub').textContent = wr.w ? `Стена кухни · ${Math.round(wr.w.length || wr.w.L)} см` : wr.wallOf.name;
+    btn('esub').textContent = wr.wallOf.name + (wr.w ? ` · ${Math.round(wr.w.length || wr.w.L)} см` : '');
     btn('eundo').hidden = true; inputs = {};
     const cb = el('input'); cb.type = 'checkbox'; cb.checked = !solid.has(wr.id);
     cb.onchange = () => setSolid([wr.id], !cb.checked);
@@ -988,22 +1118,45 @@ function renderEditor() {
   }
   btn('esw').style.background = swatch(it);
   btn('etitle').textContent = it.label;
-  btn('esub').textContent = it.wall ? `Стена ${it.wall}` : it.room ? roomById(it.room).name : it.group;
-  inputs = {}; btn('fields').replaceChildren();
-  sections(it).forEach(([title, rows]) => {
+  btn('esub').textContent = `${roomById(it.room).name} · ${it.wall ? 'стена ' + it.wall : 'группа'}`;
+  inputs = {}; cinputs = {}; btn('fields').replaceChildren();
+  sections(it).filter(([, rows]) => rows.length).forEach(([title, rows]) => {
     btn('fields').append(el('div', 'stitle', title));
     rows.forEach(([k, label]) => {
+      const link = it.link[k], was = origById[it.id].link[k];     // link: the value is derived (formula / parent); was: it was in the YAML
       const num = el('input'); num.type = 'number'; num.step = 1;
       const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' ? 1 : .5;   // slider and number box edit the same value
       num.oninput = rng.oninput = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setField(it, k, v); };
       num.onchange = () => { num.value = r1(it[k]); };                // show the clamped value
       inputs[k] = { num, rng };
+      num.disabled = rng.disabled = !!link;                           // derived: edit its source, or unlock it
       const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' ? 'шт' : 'см'));
-      const top = el('div', 'top'); top.append(el('span', '', label), box);
+      const top = el('div', 'top'); top.append(el('span', '', label));
+      if (link || was) {                                              // 🔗 linked -> set by hand;  🔓 set by hand -> back to the link
+        const b = el('button', 'eye', link ? '🔗' : '🔓');
+        b.title = link ? [link.expr && 'Формула ' + link.expr, link.from && `унаследовано от «${byId(link.from).label}»`].filter(Boolean).join(', ') + '. Нажмите — задать вручную'
+                       : 'Задано вручную. Нажмите — вернуть привязку';
+        b.onclick = () => {
+          record();
+          if (link) it.def[k] = it[k]; else if (was.from) delete it.def[k]; else it.def[k] = origById[it.id].def[k];
+          resolveAll(); saveEdits(); build(); renderEditor(); refresh();
+        };
+        top.append(b);
+      }
+      top.append(box);
       const f = el('div', 'f'); f.append(top, rng);
       btn('fields').append(f);
     });
   });
+  if (it.type === 'kitchen') {                                        // the palette of every `kitchen:` cabinet of the room
+    const g = el('div', 'kcol');
+    PAL.forEach(([k, label]) => {
+      const inp = el('input'); inp.type = 'color'; inp.title = label; inp.value = it[k]; cinputs[k] = inp;
+      inp.oninput = () => { record(it.id + '.' + k); it.def[k] = it[k] = inp.value; saveEdits(); build(); renderTree(); refresh(); };
+      const l = el('label'); l.append(inp, el('span', '', label)); g.append(l);
+    });
+    btn('fields').append(el('div', 'stitle', 'Цвета кухни'), g);
+  }
   refresh();
 }
 
@@ -1011,62 +1164,122 @@ function renderEditor() {
 function refresh() {
   const it = byId(sel);
   if (it) {
-    const o = origById[it.id];
+    const o = origById[it.id], diff = k => JSON.stringify(it.def[k]) !== JSON.stringify(o.def[k]);
     Object.entries(inputs).forEach(([k, { num, rng }]) => {
       [rng.min, rng.max] = rangeOf(it, k); rng.value = it[k];       // limits depend on the other fields
       if (num !== document.activeElement) num.value = r1(it[k]);
-      num.classList.toggle('mod', it[k] !== o[k]);
+      num.classList.toggle('mod', diff(k));
     });
-    btn('eundo').hidden = !Object.keys(inputs).some(k => it[k] !== o[k]);
-    if (it.room) btn('ehint').textContent = `Координаты кухни: X ${r1(it.x)}…${r1(it.x + it.sx)}, Y ${r1(it.y)}…${r1(it.y + it.sy)} см.\n`
-      + 'Размеры по плану застройщика (±10–15 см) — уточните рулеткой.';
-    else {
-      const L = wallById(it.wall).L;
-      btn('ehint').textContent = `Стена ${it.wall}: ${r1(L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(L - it.position - it.width)} см.`;
-    }
+    PAL.forEach(([k]) => { if (cinputs[k]) { cinputs[k].value = it[k]; cinputs[k].classList.toggle('mod', diff(k)); } });
+    btn('eundo').hidden = !Object.keys({ ...inputs, ...cinputs }).some(diff);
+    const w = edgeOf(it);
+    btn('ehint').textContent = (w ? `Стена ${it.wall}: ${r1(w.L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(w.L - it.position - it.width)} см.` : '')
+      + (isGroup(it) ? 'Группа без своей формы. Что задано здесь, наследуют вложенные объекты, у которых это поле не задано.' : '')
+      + (it.kind || isGroup(it) ? '' : '\nШирина — вдоль стены, глубина — от стены в комнату.')
+      + (roomById(it.room).main ? '' : '\nРазмеры по плану застройщика (±10–15 см) — уточните рулеткой.')
+      + (Object.keys(it.link).some(k => it.link[k]) ? '\n🔗 — значение выведено из формулы или родителя; замок переключает на ручное.' : '')
+      + (it.err ? `\n⚠ ${it.err}` : '');
   }
   btn('yaml').value = yamlText();
+  syncGizmo();
 }
 
 function yamlText() {
+  const fmt = v => typeof v === 'number' ? r1(v) : JSON.stringify(v);        // a link stays a quoted "=expression"
   const hole = h => `${h.id}:  # стена ${h.wall}\n` + KEYS.hole.filter(k => k !== 'sill' || h.kind === 'window')
-    .map(k => `  ${k === 'sill' ? 'sill_height' : k}: ${r1(h[k])}`).join('\n');
-  const obj = o => `  - id: ${o.id}\n    label: ${JSON.stringify(o.label)}\n    group: ${JSON.stringify(o.group)}\n`
-    + (o.type ? `    type: ${o.type}\n` : '') + `    wall: ${o.wall}\n`
-    + KEYS.object.filter(k => o[k] != null && !(['gap', 'elevation'].includes(k) && !o[k]))   // zero gap/elevation are defaults
-      .map(k => `    ${k}: ${r1(o[k])}`).join('\n') + `\n    color: "${o.color}"`
-    + (o.kitchen ? `\n    kitchen: ${o.kitchen}` : '') + (o.facade_side ? `\n    facade_side: ${o.facade_side}` : '')
-    + (o.model ? `\n    model: ${o.model}` : '')
-    + (o.cutout ? `\n    cutout: {in: ${o.cutout.in}, width: ${o.cutout.width}, depth: ${o.cutout.depth}}` : '');
+    .map(k => `  ${k === 'sill' ? 'sill_height' : k}: ${fmt(h.def[k])}`).join('\n');
+  // one object block for every room; `p` = indent of the "- id" line (2 in rooms/*.yaml, 6 in apartment.yaml)
+  const obj = (o, p) => {
+    const f = (k, v) => `${p}  ${k}: ${v}`, ps = Object.keys(o.params || {});
+    return [`${p}- id: ${o.id}`, f('label', JSON.stringify(o.label)), ...(o.type ? [f('type', o.type)] : []),
+      ...(o.parent ? [f('parent', o.parent)] : []), ...(o.wall ? [f('wall', o.wall)] : []),
+      ...KEYS.object.filter(k => o.def[k] !== undefined && !(['gap', 'elevation'].includes(k) && o.def[k] === 0 && !o.parent))   // zero gap/elevation are defaults
+        .map(k => f(k, fmt(o.def[k]))),
+      ...(ps.length ? [f('params', `{${ps.map(n => `${n}: {value: ${fmt(o.def[n])}, label: ${JSON.stringify(o.params[n].label)}}`).join(', ')}}`)] : []),
+      ...(o.type === 'kitchen' ? PAL.map(([c]) => f(c, `"${o[c]}"`)) : []),
+      ...(isGroup(o) ? [] : [f('color', `"${o.color}"`)]),
+      ...(o.kitchen ? [f('kitchen', o.kitchen)] : []), ...(o.facade_side ? [f('facade_side', o.facade_side)] : []),
+      ...(o.model ? [f('model', o.model)] : []),
+      ...(o.cutout ? [f('cutout', `{in: ${o.cutout.in}, width: ${o.cutout.width}, depth: ${o.cutout.depth}}`)] : [])].join('\n');
+  };
   return `# окна и проёмы: обновить поля в windows: / openings: файла rooms/*.yaml (sill → sill_height)\n${R.holes.map(hole).join('\n')}`
-    + `\n\n# цвета кухни: заменить блок kitchen_colors: целиком\nkitchen_colors:\n`
-    + KCOL.map(([k]) => `  ${k}: "${R.kitchen[k]}"`).join('\n')
-    + `\n\n# объекты: заменить блок objects: целиком\nobjects:\n${R.objects.map(obj).join('\n')}`
-    + R.apartment.filter(r => r.items.length).map(r => `\n\n# apartment.yaml, комната ${r.id}: заменить items: целиком\n    items:\n`
-      + r.items.map(i => `      - id: ${i.id}\n        label: ${JSON.stringify(i.label)}\n`
-        + KEYS.box.filter(k => k !== 'elevation' || i[k]).map(k => `        ${k}: ${r1(i[k])}`).join('\n')
-        + `\n        color: "${i.color}"`).join('\n')).join('');
+    + `\n\n# ${MAIN.name} (rooms/${MAIN.id}.yaml): заменить блок objects: целиком\nobjects:\n${MAIN.objects.map(o => obj(o, '  ')).join('\n')}`
+    + R.apartment.filter(r => r.objects.length).map(r => `\n\n# ${r.name} (apartment.yaml, комната ${r.id}): заменить objects: целиком\n    objects:\n`
+      + r.objects.map(o => obj(o, '      ')).join('\n')).join('');
 }
 
 function resetItems(items) {
   record();
-  items.forEach(i => Object.assign(i, pick(origById[i.id])));
-  saveEdits(); build(); renderEditor(); refresh();
+  items.forEach(i => { i.def = structuredClone(origById[i.id].def); });
+  resolveAll(); saveEdits(); build(); renderTree(); renderEditor(); refresh();
 }
 btn('eundo').onclick = () => resetItems([byId(sel)]);
 btn('byaml').onclick = () => btn('ydlg').showModal();
 
+// ---------- move gizmo: three arrows (+ plane squares) on the selected item, like in any 3D editor ----------
+// three.js TransformControls (translate mode, local space) drives an invisible proxy placed at the centre of the item's box.
+// Its axes are the item's own: red = along the wall (position), green = up (elevation / sill), blue = from the wall (gap).
+// Dragging does not move any mesh: the proxy's position is converted back to the item's wall fields and the scene is rebuilt,
+// so limits (clamp), undo, localStorage and the YAML export work exactly as for the sliders.
+function syncGizmo() {
+  const it = byId(sel), w = it && !wallRow(sel) && edgeOf(it);
+  if (!w || !gizmoOn || (it.kind ? hid.has(shellId(MAIN)) : hid.has(it.id))) { tc.detach(); return; }
+  const u = it.position + it.width / 2, t = it.kind ? 0 : it.gap + it.depth / 2;       // openings sit in the wall line
+  const z = it.kind ? (it.sill || 0) + it.height / 2 : it.elevation + it.height / 2;
+  proxy.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, z));
+  proxy.rotation.y = Math.atan2(w.dy, w.dx);
+  tc.showX = true; tc.showY = it.kind !== 'door'; tc.showZ = !it.kind;                 // a door only slides along its wall, a window also up
+  tc.attach(proxy);
+}
+function dragGizmo() {
+  const it = byId(sel), w = it && edgeOf(it);
+  if (!w) return;
+  if (dragFresh) { record(); dragFresh = false; }                                      // one undo step per drag
+  const p = proxy.position, px = p.x / S - w.a[0], py = -p.z / S - w.a[1], z = p.y / S;
+  const u = px * w.dx + py * w.dy, t = -(px * w.nx + py * w.ny);                       // along the wall / from it into the room
+  const half = v => Math.round(v * 2) / 2, ax = tc.axis || '', patch = {};            // 0.5 cm steps, like the sliders
+  if (ax.includes('X')) patch.position = half(u - it.width / 2);
+  if (ax.includes('Y')) patch[it.kind ? 'sill' : 'elevation'] = half(z - it.height / 2);
+  if (ax.includes('Z') && !it.kind) patch.gap = half(t - it.depth / 2);
+  if (Object.keys(patch).length) applyPatch(it, patch);                                // clamps, rebuilds, calls syncGizmo
+}
+const gizmoScene = new THREE.Scene();                                                  // drawn over the room, after the AO pass
+const proxy = new THREE.Object3D(); gizmoScene.add(proxy);
+const tc = new TransformControls(camera, renderer.domElement);
+tc.setMode('translate'); tc.setSpace('local'); tc.setSize(.8);
+gizmoScene.add(tc.getHelper());
+let dragFresh = false;
+// the first click only selects (orange box); a second click on the already selected item turns the gizmo on.
+// Another item, empty space or Esc selects something else / nothing, and the gizmo is off again.
+let gizmoOn = false;
+tc.addEventListener('dragging-changed', e => { controls.enabled = !e.value; dragFresh = e.value; });
+tc.addEventListener('objectChange', dragGizmo);
+
 // click on the scene selects (a drag is camera orbit, not a click)
 const ray = new THREE.Raycaster();
 let down = null;
-renderer.domElement.addEventListener('pointerdown', e => { down = e.button === 0 ? [e.clientX, e.clientY] : null; });
+renderer.domElement.addEventListener('pointerdown', e => { down = e.button === 0 && !tc.axis ? [e.clientX, e.clientY] : null; });   // a press on an arrow is not a click
 renderer.domElement.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
   // the raycaster ignores `visible`, so skip cut-away walls and the openings of a hidden wall by hand
-  select(ray.intersectObjects(pickables.filter(o => o.visible && o.parent.visible), false)[0]?.object.userData.id ?? null);
+  const id = ray.intersectObjects(pickables.filter(o => o.visible && o.parent.visible), false)[0]?.object.userData.id ?? null;
+  const again = id !== null && id === sel;                     // second click on the selected item
+  select(id);
+  if (again) { gizmoOn = true; syncGizmo(); }
+  revealSel();
 });
+// picked on the scene: open its tree group and scroll the tree so the row sits in the middle
+// (not on a click in the tree itself: the list must not jump under the pointer)
+function revealSel() {
+  const tree = btn('tree'), row = tree.querySelector('.item.sel');
+  if (!row) return;
+  for (let d = row.closest('details'); d; d = d.parentElement.closest('details'))
+    if (!d.open) d.open = true;                                // the folder and its room; ontoggle forgets the collapsed state
+  const tr = tree.getBoundingClientRect(), rr = row.getBoundingClientRect();
+  tree.scrollTo({ top: tree.scrollTop + rr.top - tr.top - (tree.clientHeight - rr.height) / 2, behavior: 'smooth' });
+}
 addEventListener('keydown', e => {
   if (btn('ydlg').open) return;
   if (e.key === 'Escape') return select(null);
@@ -1131,13 +1344,14 @@ document.body.classList.toggle('hide-labels', ui.labels === false); btn('blabels
 zoneGroup.visible = !!ui.zones; btn('bzones').classList.toggle('on', zoneGroup.visible);
 // the user moved the camera by hand: it is no longer in any of the preset views
 controls.addEventListener('change', () => { if (!quiet && view) { view = ''; markView(); } saveUi(); });
-renderTree(); renderEditor(); refresh(); syncKitchen();
+renderTree(); renderEditor(); refresh(); revealSel();
 renderer.setAnimationLoop(() => {
   fly(); controls.update(); updateWalls();
   // near plane follows the zoom: 1 mm in close-ups, 5 cm from afar (keeps depth precision, no flicker)
   const near = clamp(camera.position.distanceTo(controls.target) / 20, .001, .05);
   if (!isOrtho && Math.abs(persp.near - near) > 1e-5) { persp.near = near; persp.updateProjectionMatrix(); }
   if (ao) { renderPass.camera = gtao.camera = camera; composer.render(); } else renderer.render(scene, camera);
+  if (tc.object) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(gizmoScene, camera); renderer.autoClear = true; }   // gizmo on top
   labelRenderer.render(scene, camera);
 });
 window.__ready = true;</script>
