@@ -4,83 +4,93 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
+<!-- UI kit: Shoelace (web components). Theme follows the system: the dark theme is a class on <html>. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+<script>
+  { const mq = matchMedia('(prefers-color-scheme: dark)'), sync = () => document.documentElement.classList.toggle('sl-theme-dark', mq.matches); sync(); mq.addEventListener('change', sync); }
+</script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
 <style>
-  :root { --bg:#f4f1ec; --panel:rgba(255,255,255,.95); --ink:#2b2b2b; --muted:#6b6b6b; --accent:#3d6e8c; --line:rgba(127,127,127,.28); --hover:rgba(127,127,127,.13); --mod:#c0763a; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#1c1d1f; --panel:rgba(35,36,40,.95); --ink:#ececec; --muted:#a0a0a0; --accent:#7fb3d5; --mod:#e0a060; } }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; overflow:hidden; }
+  :root { --bg:#f4f1ec; --mod:#c0763a;
+    --ink:var(--sl-color-neutral-900); --muted:var(--sl-color-neutral-600); --line:var(--sl-color-neutral-200);
+    --hover:var(--sl-color-neutral-100); --accent:var(--sl-color-primary-600);
+    --panel:color-mix(in srgb, var(--sl-color-neutral-0) 95%, transparent); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1d1f; --mod:#e0a060; } }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.4 var(--sl-font-sans); overflow:hidden; }
+  [hidden] { display:none !important; }
+  :not(:defined) { visibility:hidden; }               /* a Shoelace element is invisible until it is upgraded: no flash of raw markup */
   #c { position:fixed; inset:0; }
-  .panel { position:fixed; top:12px; box-sizing:border-box; width:min(300px, calc(100vw - 24px)); max-height:calc(100vh - 24px); background:var(--panel); border-radius:12px; padding:12px; box-shadow:0 2px 14px rgba(0,0,0,.18); }
-  #panel { left:12px; overflow:auto; }
-  #side { right:12px; display:flex; flex-direction:column; gap:10px; }
   .muted, .hint { color:var(--muted); font-size:11px; }
-  h1 { font-size:15px; margin:0; }
-  h2 { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:0 0 4px; }
-  button { font:inherit; font-size:12px; padding:5px 10px; border-radius:6px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
-  button:hover { background:var(--hover); }
-  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
-
-  /* left panel: view controls */
-  .sec { display:grid; grid-template-columns:74px 1fr; gap:6px; align-items:center; margin-top:8px; }
-  .sec > .lab { font-size:11px; color:var(--muted); }
-  .seg { display:flex; } .seg button { flex:1; border-radius:0; margin-left:-1px; padding:5px 6px; }
-  .seg button:first-child { border-radius:6px 0 0 6px; margin-left:0; } .seg button:last-child { border-radius:0 6px 6px 0; }
-  .chips { display:flex; flex-wrap:wrap; gap:4px; }
-  .rng { display:flex; align-items:center; gap:8px; }
-  .rng input { flex:1; min-width:0; margin:0; accent-color:var(--accent); }
-  .rng span { min-width:30px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; }
-  .kcol { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; }
-  .kcol label { display:flex; flex-direction:column; align-items:center; gap:2px; font-size:11px; color:var(--muted); cursor:pointer; }
-  .kcol input[type=color] { width:100%; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; }
-  .kcol input.mod { border-color:var(--mod); }
-  .ocol { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); cursor:pointer; }
-  .ocol input[type=color] { width:44px; height:26px; padding:0 2px; border:1px solid var(--line); border-radius:6px; background:transparent; cursor:pointer; flex:none; }
-  .ocol input.mod { border-color:var(--mod); }
-  details.help { margin-top:10px; font-size:11px; color:var(--muted); } details.help summary { cursor:pointer; }
-
-  /* right panel: outliner */
-  #treewrap { min-height:0; display:flex; flex-direction:column; }
-  .thead { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
-  .thead h2 { margin:0; } .thead button { padding:2px 8px; font-size:11px; }
-  #tree { overflow:auto; max-height:34vh; margin:0 -4px; padding:0 4px; }
-  #tree details { margin-bottom:2px; }
-  #tree summary { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; cursor:pointer; list-style:none; font-weight:600; font-size:12px; }
-  #tree summary::-webkit-details-marker { display:none; }
-  #tree summary::before { content:'▸'; color:var(--muted); width:10px; }
-  #tree details[open] > summary::before { content:'▾'; }
-  #tree summary:hover, #tree .item:hover { background:var(--hover); }
-  /* a room is a top-level node; inside it the same folders for every room: walls, openings, objects */
-  #tree > details { margin-bottom:6px; }
-  #tree > details > summary { font-size:13px; }
-  #tree details details { margin-left:10px; }
-  #tree details details > summary { font-weight:500; color:var(--muted); }
-  #tree details details .item { padding-left:18px; }
-  #tree summary.sel { background:var(--accent); color:#fff; } #tree summary.sel .cnt { color:inherit; }
-  #tree .cnt { color:var(--muted); font-weight:400; }
-  #tree .item { display:flex; align-items:center; gap:7px; padding:4px 6px 4px 22px; border-radius:6px; cursor:pointer; }
-  #tree .item.sel { background:var(--accent); color:#fff; }
-  #tree .item.off .nm, #tree .item.off .sw { opacity:.4; }
-  #tree .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  h1 { font-size:14px; margin:0; line-height:1.25; }
   .sw { display:inline-block; width:10px; height:10px; border-radius:3px; border:1px solid rgba(0,0,0,.25); flex:none; }
-  .eye { margin-left:auto; padding:2px 4px; border:0; color:inherit; opacity:.65; line-height:0; } .eye:hover { opacity:1; }
+
+  /* side panels: docked to the screen edges, the whole height */
+  .dock { position:fixed; top:0; bottom:0; z-index:3; box-sizing:border-box; width:min(var(--dw), 100vw); display:flex; flex-direction:column;
+          background:var(--panel); backdrop-filter:blur(10px); }
+  #panel { left:0; --dw:268px; border-right:1px solid var(--line); }
+  #side { right:0; --dw:340px; border-left:1px solid var(--line); }
+  .dhead { flex:none; display:flex; align-items:center; gap:2px; box-sizing:border-box; min-height:42px; padding:4px 6px 4px 12px; border-bottom:1px solid var(--line); }
+  .dhead .dtitle { flex:1; min-width:0; }
+  .dhead h2 { margin:0; font-size:13px; font-weight:600; }
+  .dbody { flex:1; min-height:0; overflow:auto; padding:2px 12px 14px; }
+  sl-icon-button { font-size:16px; }
+
+  /* left panel: scene settings */
+  .sec { display:grid; grid-template-columns:76px 1fr; gap:6px; align-items:center; margin-top:10px; }
+  .sec > sl-tooltip { display:contents; }
+  .lab { font-size:11px; color:var(--muted); }
+  .sec sl-button-group { display:flex; } .sec sl-button-group sl-button { flex:1; }
+  .sec sl-button-group::part(base) { width:100%; }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .switches { display:grid; grid-template-columns:1fr 1fr; gap:8px 6px; }
+  .rng { display:flex; align-items:center; gap:8px; }
+  .rng sl-range { flex:1; min-width:0; } .rng span { min-width:30px; text-align:right; font-variant-numeric:tabular-nums; } .rng span.wide { min-width:74px; white-space:nowrap; }
+  .frow { display:flex; gap:6px; margin-top:12px; } .frow sl-button { flex:1; }
+  sl-details.help { margin-top:12px; font-size:11px; color:var(--muted); }
+  sl-details.help::part(base) { border-color:var(--line); background:transparent; }
+  sl-details.help::part(header) { padding:8px 10px; font-size:12px; }
+  sl-details.help::part(content) { padding:0 10px 10px; }
+  sl-tooltip { --max-width:300px; } sl-tooltip::part(body) { white-space:pre-line; font-size:12px; }
+
+  /* right panel: outliner (top) + inspector (bottom) */
+  #split { flex:1; min-height:0; --divider-width:6px; --divider-hit-area:16px; }
+  #split::part(divider) { background:var(--line); }
+  #treewrap, #insp { height:100%; box-sizing:border-box; overflow:auto; }
+  #treewrap { padding:2px 4px 6px 0; }
+  #insp { padding:8px 12px 16px; }
+  sl-tree { --indent-size:10px; --indent-guide-width:1px; --indent-guide-color:var(--line); --indent-guide-offset:0; }
+  sl-tree-item { font-size:12px; --show-duration:0s; --hide-duration:0s; }
+  sl-tree-item::part(item) { padding-block:1px; min-height:24px; box-sizing:border-box; }
+  sl-tree-item::part(item):hover { background:var(--hover); }
+  sl-tree-item::part(item--selected) { background:color-mix(in srgb, var(--accent) 22%, transparent); border-inline-start-color:var(--accent); }
+  sl-tree-item::part(label) { display:flex; align-items:center; gap:6px; flex:1; min-width:0; }
+  sl-tree-item::part(expand-button) { padding:0 2px; font-size:12px; }
+  sl-tree-item .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  sl-tree-item .cnt { color:var(--muted); font-size:11px; }
+  sl-tree > sl-tree-item > .nm { font-weight:600; }
+  sl-tree-item sl-tree-item[data-key] > .nm { color:var(--muted); }
+  sl-tree-item.off > .nm, sl-tree-item.off > .sw { opacity:.4; }
+  .tb { flex:none; font-size:14px; } .tb::part(base) { padding:2px 4px; color:var(--muted); } .tb::part(base):hover { color:var(--ink); }
 
   /* right panel: inspector */
-  #insp { border-top:1px solid var(--line); padding-top:10px; overflow:auto; min-height:60px; }
   #empty { color:var(--muted); font-size:12px; }
-  .ehead { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .ehead { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
   .ehead > div { flex:1; min-width:0; } #etitle { font-weight:600; font-size:14px; }
-  .stitle { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:10px 0 2px; }
+  .stitle { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:12px 0 2px; }
   #fields .f { margin:7px 0; }
-  #fields .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-  #fields input[type=range] { display:block; width:100%; margin:3px 0 0; accent-color:var(--accent); }
-  .ibox { position:relative; display:block; width:96px; }
-  .ibox input[type=number] { width:100%; box-sizing:border-box; padding:4px 26px 4px 7px; font:inherit; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:6px; text-align:right; }
-  .ibox input[type=number]:focus { outline:2px solid var(--accent); outline-offset:-1px; }
-  .ibox input.mod { border-color:var(--mod); }
-  .unit { position:absolute; right:7px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--muted); pointer-events:none; }
-  #ehint { white-space:pre-line; margin-top:8px; }
-  label.chk { display:flex; align-items:center; gap:8px; margin:8px 0; cursor:pointer; } label.chk input { accent-color:var(--accent); margin:0; }
-  .frow { display:flex; gap:6px; } .frow button { flex:1; }
-  button:disabled { opacity:.4; cursor:default; } button:disabled:hover { background:transparent; }
+  #fields .top { display:flex; align-items:center; gap:4px; margin-bottom:1px; } #fields .top > span { flex:1; min-width:0; }
+  #fields sl-input { width:98px; flex:none; }
+  #fields sl-input::part(input) { text-align:right; font-variant-numeric:tabular-nums; }
+  #fields sl-input.mod::part(base) { border-color:var(--mod); }
+  #fields sl-range { display:block; --thumb-size:14px; --track-height:4px; }
+  sl-color-picker.mod::part(trigger) { outline:2px solid var(--mod); outline-offset:1px; }
+  .kcol { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; justify-items:center; margin-top:4px; }
+  .kcol label, .ocol { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+  .kcol label { flex-direction:column; gap:3px; }
+  .lock::part(base) { padding:2px 4px; }
+  #ehint { white-space:pre-line; margin-top:10px; }
+  #fields sl-switch { margin:6px 0; }
 
   .lbl { font-size:11px; padding:1px 5px; border-radius:4px; background:rgba(255,255,255,.85); color:#222; white-space:nowrap; pointer-events:none; }
   .lbl.dim { background:rgba(61,110,140,.9); color:#fff; }
@@ -89,88 +99,113 @@
   #speed { position:fixed; left:50%; bottom:16px; transform:translateX(-50%); padding:5px 12px; border-radius:8px; background:var(--panel); box-shadow:0 2px 10px rgba(0,0,0,.2); font-size:12px; pointer-events:none; opacity:0; transition:opacity .3s; }
   #speed.show { opacity:1; }
 
-  /* desktop: drag the bar between the tree and the inspector; each panel hides to a tab on its screen edge */
-  #split { flex:none; height:10px; margin:2px 0 -2px; cursor:row-resize; touch-action:none; display:flex; align-items:center; }
-  #split::after { content:''; flex:1; height:3px; border-radius:2px; background:var(--line); }
-  #split:hover::after, #split.drag::after { background:var(--accent); }
-  .pclose { padding:2px 8px; font-size:11px; }
-  .ptab { position:fixed; top:12px; z-index:5; padding:10px 6px; background:var(--panel); box-shadow:0 2px 10px rgba(0,0,0,.2); display:none; writing-mode:vertical-rl; }
-  #tab-panel { left:0; border-radius:0 8px 8px 0; } #tab-side { right:0; border-radius:8px 0 0 8px; }
+  /* desktop: each panel hides to a tab on its screen edge */
+  .ptab { position:fixed; top:8px; z-index:4; display:none; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+  #tab-panel { left:6px; } #tab-side { right:6px; }
   body.hide-panel #panel, body.hide-side #side { display:none; }
   body.hide-panel #tab-panel, body.hide-side #tab-side { display:block; }
 
-  /* phone: the scene gets the whole screen; "Вид" / "Объекты" in a bottom bar open one panel at a time as a bottom sheet */
+  /* phone: the scene gets the whole screen; "Вид" / "Помещения" in a bottom bar open one panel at a time as a bottom sheet */
   #mbar { display:none; }
   @media (max-width: 700px) {
-    #mbar { display:flex; gap:6px; position:fixed; left:50%; transform:translateX(-50%); bottom:calc(10px + env(safe-area-inset-bottom));
+    #mbar { display:flex; gap:6px; position:fixed; z-index:5; left:50%; transform:translateX(-50%); bottom:calc(10px + env(safe-area-inset-bottom));
             padding:5px; background:var(--panel); border-radius:12px; box-shadow:0 2px 14px rgba(0,0,0,.25); }
-    #mbar button { font-size:15px; padding:9px 18px; }
-    #panel, #side { display:none; left:8px; right:8px; width:auto; top:auto; bottom:calc(66px + env(safe-area-inset-bottom));
-             max-height:min(62vh, calc(100vh - 150px)); }
-    body.sheet-panel #panel { display:block; }
-    body.sheet-side #side { display:flex; }
-    #split, .pclose, .ptab { display:none !important; }     /* the phone has its bottom bar instead */
-    #treewrap { flex:none; } #tree { max-height:24vh !important; }      /* tree keeps its height, the editor below scrolls */
-    #insp { flex:1; min-height:0; }
-    #tree summary, #tree .item { padding-top:8px; padding-bottom:8px; }
-    .eye { padding:4px 8px; }
-    button { padding:7px 10px; }
-    .seg button { padding:7px 6px; }
-    details.help { display:none; }
+    .dock { display:none; top:auto; left:8px; right:8px; width:auto; bottom:calc(66px + env(safe-area-inset-bottom));
+            height:min(62vh, calc(100vh - 150px)); border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:0 2px 14px rgba(0,0,0,.25); }
+    body.sheet-panel #panel, body.sheet-side #side { display:flex; }
+    [data-hide], .ptab { display:none !important; }     /* the phone has its bottom bar instead */
+    sl-details.help { display:none; }
     .lbl { font-size:10px; }
   }
 </style>
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
+  "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.webgpu.js",
+  "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.tsl.js",
+  "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/",
+  "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/src/index.js",
+  "three-mesh-bvh/webgpu": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.18/src/webgpu/index.js",
+  "three-gpu-pathtracer/webgpu": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.28/src/webgpu/index.js",
+  "oidn-webgpu": "https://cdn.jsdelivr.net/npm/oidn-webgpu@0.6.0/dist/oidn.js"
 } }
 </script>
 </head>
 <body>
 <div id="c"></div>
-<div id="panel" class="panel">
-  <button class="pclose" data-hide="panel" title="Скрыть панель настроек сцены" style="float:right">‹ Скрыть</button>
-  <h1 id="title"></h1>
-  <div class="muted" id="meta"></div>
-  <div class="sec"><span class="lab">Вид</span>
-    <div class="seg"><button data-view="iso">3D</button><button data-view="top">Сверху</button></div></div>
-  <div class="sec"><span class="lab">Стена изнутри</span><div class="seg" id="wallviews"></div></div>
-  <div class="sec"><span class="lab">Камера</span>
-    <div class="seg"><button id="bpersp">Перспектива</button><button id="bortho">Ортогональная</button></div></div>
-  <div class="sec"><span class="lab">Показать</span>
-    <div class="chips"><button id="blabels">Подписи</button><button id="bzones">Зоны</button><button id="bao">Затенение (AO)</button><button id="bapt" title="Показать / скрыть остальные комнаты квартиры (кухня-гостиная остаётся как есть)">Все комнаты</button></div></div>
-  <div class="sec" title="Стена прячется, пока угол между её внешней нормалью и направлением на камеру меньше этого значения. Больше — стены прячутся раньше (при повороте камеры сильнее вбок), меньше — только когда камера смотрит почти прямо на стену. 0° — срез выключен."><span class="lab">Угол среза</span>
-    <div class="rng"><input type="range" id="rcut" min="0" max="90" step="1"><span id="vcut"></span></div></div>
-  <div class="frow" style="margin-top:10px"><button id="bundo" title="Ctrl+Z">↶ Отменить</button><button id="bredo" title="Ctrl+Y / Ctrl+Shift+Z">↷ Вернуть</button></div>
-  <details class="help"><summary>Управление мышью</summary>
-    Вращение вокруг центра: левая кнопка / один палец. Сдвиг: средняя кнопка / два пальца. Масштаб: колесо / щипок.
-    Осмотреться (повернуть голову, камера стоит на месте): правая кнопка.
-    Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
-    Перемещение: клик по предмету выбирает его и показывает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
-    квадраты между стрелками двигают сразу по двум осям. Шаг 0,5 см, границы те же, что у ползунков, Ctrl+Z отменяет.<br>
-    Каждый следующий клик по нему же: кольцо поворота в горизонтальной плоскости (шаг 45°), затем контролы пропадают
-    (предмет остаётся выбранным), потом снова стрелки. Выбор из списка справа показывает только рамку.<br>
-    Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</details>
-</div>
-<div id="side" class="panel">
-  <div id="treewrap"><div class="thead"><h2>Помещения</h2><span><button id="bcollapse" title="Свернуть все помещения и папки в дереве">Свернуть все</button> <button class="pclose" data-hide="side" title="Скрыть панель объектов">Скрыть ›</button></span></div><div id="tree"></div></div>
-  <div id="split" title="Потяните, чтобы изменить высоту дерева"></div>
-  <div id="insp">
-    <div id="empty">Выберите стену, проём или предмет в списке или кликните по нему на сцене.</div>
-    <div id="editor" hidden>
-      <div class="ehead"><i id="esw" class="sw"></i>
-        <div><div id="etitle"></div><div class="muted" id="esub"></div></div>
-        <button id="eundo" title="Вернуть исходные значения">↺ Сбросить</button></div>
-      <div id="fields"></div>
-      <div class="hint" id="ehint"></div>
-    </div>
+<aside id="panel" class="dock">
+  <header class="dhead">
+    <div class="dtitle"><h1 id="title"></h1><div class="muted" id="meta"></div></div>
+    <sl-icon-button name="chevron-bar-left" label="Скрыть панель" title="Скрыть панель настроек сцены" data-hide="panel"></sl-icon-button>
+  </header>
+  <div class="dbody">
+    <div class="sec"><span class="lab">Вид</span>
+      <sl-button-group label="Вид"><sl-button size="small" data-view="iso">3D</sl-button><sl-button size="small" data-view="top">Сверху</sl-button></sl-button-group></div>
+    <div class="sec"><span class="lab">Стена изнутри</span><div class="chips" id="wallviews"></div></div>
+    <div class="sec"><span class="lab">Камера</span>
+      <sl-button-group label="Камера"><sl-button size="small" id="bpersp">Перспектива</sl-button><sl-button size="small" id="bortho">Ортогональная</sl-button></sl-button-group></div>
+    <div class="sec"><span class="lab">Показать</span>
+      <div class="switches">
+        <sl-switch size="small" id="blabels">Подписи</sl-switch>
+        <sl-switch size="small" id="bzones">Зоны</sl-switch>
+        <sl-switch size="small" id="bao">Затенение (AO)</sl-switch>
+        <sl-switch size="small" id="bapt" title="Показать / скрыть остальные комнаты квартиры (кухня-гостиная остаётся как есть)">Все комнаты</sl-switch>
+      </div></div>
+    <div class="sec">
+      <sl-tooltip placement="right" content="Солнце — ясный день: прямые лучи через окно (пятно на полу, тени от рамы и мебели), голубое небо в окне и тёплый отражённый от пола свет.
+Пасмурно — день без солнца: окно светит мягко и ровно, резких теней нет.
+Вечер — за окном темно, горят светильники, лампочка и подсветка под шкафами.
+Все источники — объекты в дереве (группа «Освещение»), у каждого свои настройки."><span class="lab">Свет</span></sl-tooltip>
+      <sl-button-group label="Свет"><sl-button size="small" data-light="sun">Солнце</sl-button><sl-button size="small" data-light="cloud">Пасмурно</sl-button><sl-button size="small" data-light="night">Вечер</sl-button></sl-button-group></div>
+    <div class="sec" id="rendersec" hidden>
+      <sl-tooltip placement="right" content="Фотореалистичный рендер: трассировка путей (как Cycles в Blender) — настоящие отражения, переотражения света, мягкие тени, стекло. Картинка очищается за несколько секунд, потом денойзер дочищает остаток. Свет — текущий режим. Для честного света ставьте камеру внутрь комнаты: снаружи срезанные стены и потолок пропускают свет. Нужна видеокарта с WebGPU."><span class="lab">Рендер</span></sl-tooltip>
+      <sl-button size="small" id="brender"><sl-icon slot="prefix" name="stars"></sl-icon>Фотореалистичный</sl-button></div>
+    <div class="sec">
+      <sl-tooltip placement="right" content="Стена прячется, пока угол между её внешней нормалью и направлением на камеру меньше этого значения. Больше — стены прячутся раньше (при повороте камеры сильнее вбок), меньше — только когда камера смотрит почти прямо на стену. 0° — срез выключен."><span class="lab">Угол среза</span></sl-tooltip>
+      <div class="rng"><sl-range id="rcut" min="0" max="90" step="1" tooltip="none"></sl-range><span id="vcut"></span></div></div>
+    <div class="sec">
+      <sl-tooltip placement="right" content="Вертикальный угол обзора перспективной камеры и эквивалентное ему фокусное расстояние (для кадра 36×24 мм). Меньше угол / больше фокусное — камера «приближает», перспектива плоская. Больше угол / меньше фокусное — шире кадр и сильнее искажения по краям. Стандарт — 45° (≈29 мм). В ортогональной камере не действует."><span class="lab">Угол обзора</span></sl-tooltip>
+      <div class="rng"><sl-range id="rfov" min="15" max="110" step="1" tooltip="none"></sl-range><span id="vfov" class="wide"></span>
+        <sl-icon-button id="rfovreset" name="arrow-counterclockwise" label="Сбросить угол обзора" title="Сбросить до стандартного (45°)"></sl-icon-button></div></div>
+    <div class="frow">
+      <sl-button size="small" id="bundo" title="Ctrl+Z"><sl-icon slot="prefix" name="arrow-counterclockwise"></sl-icon>Отменить</sl-button>
+      <sl-button size="small" id="bredo" title="Ctrl+Y / Ctrl+Shift+Z"><sl-icon slot="prefix" name="arrow-clockwise"></sl-icon>Вернуть</sl-button></div>
+    <sl-details class="help" summary="Управление мышью">
+      Вращение вокруг центра: левая кнопка / один палец. Сдвиг: средняя кнопка / два пальца. Масштаб: колесо / щипок.
+      Осмотреться (повернуть голову, камера стоит на месте): правая кнопка.
+      Клик по объекту выбирает его, клик по пустому месту или Esc снимает выбор.<br>
+      Перемещение: клик по предмету выбирает его и показывает стрелки — красная вдоль стены, зелёная вверх, синяя от стены / к стене;
+      квадраты между стрелками двигают сразу по двум осям. Шаг 0,5 см, Ctrl+Z отменяет. Предмет можно ставить куда угодно.<br>
+      Каждый следующий клик по нему же: кольцо поворота в горизонтальной плоскости (шаг 45°), затем контролы пропадают
+      (предмет остаётся выбранным), потом снова стрелки. Выбор из списка справа показывает только рамку.<br>
+      Полёт: W/S — вперёд/назад, A/D — влево/вправо, Q/E — вниз/вверх. Скорость: − / + (=).</sl-details>
   </div>
-</div>
+</aside>
+<aside id="side" class="dock">
+  <header class="dhead">
+    <div class="dtitle"><h2>Помещения</h2></div>
+    <sl-icon-button id="bcollapse" name="arrows-collapse" label="Свернуть все" title="Свернуть все помещения и папки в дереве"></sl-icon-button>
+    <sl-icon-button name="chevron-bar-right" label="Скрыть панель" title="Скрыть панель объектов" data-hide="side"></sl-icon-button>
+  </header>
+  <sl-split-panel id="split" vertical position="46">
+    <div slot="start" id="treewrap"><sl-tree id="tree" selection="single"></sl-tree></div>
+    <div slot="end" id="insp">
+      <div id="empty">Выберите стену, проём или предмет в списке или кликните по нему на сцене.</div>
+      <div id="editor" hidden>
+        <div class="ehead"><i id="esw" class="sw"></i>
+          <div><div id="etitle"></div><div class="muted" id="esub"></div></div>
+          <sl-button id="eundo" size="small" title="Вернуть исходные значения"><sl-icon slot="prefix" name="arrow-counterclockwise"></sl-icon>Сбросить</sl-button></div>
+        <div id="fields"></div>
+        <div class="hint" id="ehint"></div>
+      </div>
+    </div>
+  </sl-split-panel>
+</aside>
 <div id="speed"></div>
-<button class="ptab" id="tab-panel" data-hide="panel" title="Показать панель настроек сцены">Сцена ›</button>
-<button class="ptab" id="tab-side" data-hide="side" title="Показать панель объектов">‹ Объекты</button>
-<div id="mbar"><button data-sheet="panel">Вид</button><button data-sheet="side">Помещения</button></div>
+<sl-icon-button class="ptab" id="tab-panel" name="layout-sidebar" label="Показать панель" title="Показать панель настроек сцены" data-hide="panel"></sl-icon-button>
+<sl-icon-button class="ptab" id="tab-side" name="layout-sidebar-reverse" label="Показать панель" title="Показать панель объектов" data-hide="side"></sl-icon-button>
+<div id="mbar"><sl-button data-sheet="panel">Вид</sl-button><sl-button data-sheet="side">Помещения</sl-button></div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -181,7 +216,9 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 const R = __ROOM_DATA__;
 R.objects ||= [];
@@ -212,13 +249,16 @@ const edgeOf = it => roomById(it.room).edges.find(e => e.id === it.wall);
 // ---------- containers, inheritance, links (tools/room3d/README.md) ----------
 // An object's `def` is what the YAML says per field: a number, an "=expression" (a link) or nothing; the resolved number
 // is it[k] and everything else reads that. Nothing set -> the field is inherited along the `parent` chain, else a default.
-const INHERIT = ['height', 'depth', 'elevation', 'gap', 'top'];
+const INHERIT = ['height', 'depth', 'elevation', 'gap', 'top', 'width', 'lumens', 'lumens_m', 'kelvin', 'beam', 'shadow'];   // light settings: a group of lamps holds them
 const DEFAULTS = { position: 0, width: 50, depth: 50, height: 50, elevation: 0, gap: 0, rotation: 0 };
+const LIGHT_TYPES = ['light', 'strip', 'bulb', 'sun', 'sky', 'bounce'], ENV = ['sun', 'sky', 'bounce'];   // ENV: light sources without a place in the room
+const sceneLights = MAIN.objects.filter(o => ENV.includes(o.type));
+const sceneLightKey = 'scene-lighting';
 const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a container: no geometry, holds sizes and the palette
 // ONE main colour (`color`) is editable for a simple object: a plain box, a sofa / chair model, a portal, a slat wall. Not for composite
 // ones (table: legs + top, tv, radiator, rug, an object with doors) nor for kitchen cabinets (they follow the kitchen palette).
 // A `kitchen: panel` board has its own colour too (a stand-in for a wall); without one it takes the carcass colour.
-const hasColor = it => !it.kind && !isGroup(it) && (!it.kitchen || it.kitchen === 'panel') &&!['table', 'tv', 'radiator', 'rug'].includes(it.type) && it.doors == null;
+const hasColor = it => !it.kind && !isGroup(it) && (!it.kitchen || it.kitchen === 'panel') && !['table', 'tv', 'radiator', 'rug', ...LIGHT_TYPES].includes(it.type) && it.doors == null;
 // the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
 const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
 const palOf = o => {
@@ -228,19 +268,22 @@ const palOf = o => {
 const S = 0.01;                                    // cm -> m
 const P = (x, y, z = 0) => new THREE.Vector3(x * S, z * S, -y * S);   // plan (x east, y north, z up)
 const btn = id => document.getElementById(id);
+// a toggle button of the panels: switch = checked, button = primary
+const setOn = (b, on) => { if (b.localName === 'sl-switch') b.checked = on; else { b.classList.toggle('on', on); b.variant = on ? 'primary' : 'default'; } };
 const el = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls || '', textContent: text || '' });
 const r1 = v => +v.toFixed(1);
 const clamp = (v, a, b) => Math.min(Math.max(v, a), Math.max(a, b));
 
 btn('title').textContent = R.name;
 btn('meta').textContent =
-  `${R.area_m2 ? R.area_m2 + ' м² · ' : ''}потолок ${R.ceiling} см · ${R.furniture.length + R.builtins.length + R.objects.filter(o => !isGroup(o)).length} предметов`;
+  `${R.area_m2 ? R.area_m2 + ' м² · ' : ''}потолок ${R.ceiling} см · ${R.furniture.length + R.builtins.length + R.objects.filter(o => !isGroup(o) && !sceneLights.includes(o)).length} предметов`;
 
 const host = btn('c');
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;          // soft since r182 (PCFSoftShadowMap is deprecated)
+renderer.shadowMap.autoUpdate = false;                // shadows do not depend on the camera: re-rendered only when the scene changes (updateShadows)
 renderer.toneMapping = THREE.NeutralToneMapping;     // keeps the colours (and the page-like background) close to the real ones
 host.appendChild(renderer.domElement);
 const labelRenderer = new CSS2DRenderer();
@@ -255,7 +298,8 @@ scene.background = new THREE.Color(dark ? 0x1c1d1f : 0xf4f1ec);
 // soft image-based light from a generic room: gives PBR materials something to reflect and fills the shadows
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = .5;
-const persp = new THREE.PerspectiveCamera(45, 1, 0.05, 200);   // near is adjusted to the zoom every frame
+const FOV0 = 45;                                               // default vertical field of view, deg (scene setting "Угол обзора")
+const persp = new THREE.PerspectiveCamera(FOV0, 1, 0.05, 200);   // near is adjusted to the zoom every frame
 // orthographic zoom never moves the camera, so a near plane in front of it would slice the room whenever the camera sits close
 // to the scene (e.g. after zooming in with the perspective camera and switching): the near plane is put behind the camera instead
 const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
@@ -264,6 +308,7 @@ const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -100, 100);
 const UKEY = 'planner:ui:' + R.name;
 let ui = {};
 try { ui = JSON.parse(localStorage.getItem(UKEY) || '{}') || {}; } catch { /* start with defaults */ }
+persp.fov = clamp(+(ui.fov ?? FOV0) || FOV0, 15, 110);                                  // the saved scene setting
 let isOrtho = !!ui.isOrtho, camera = isOrtho ? ortho : persp;
 let view = ui.view === 'top' || ui.view === '' || R.walls.some(w => 'wall:' + w.id === ui.view) ? ui.view : 'iso';
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -274,6 +319,13 @@ const hid = new Set(ui.hidden || []);              // hidden object ids
 // a new item follows its room (added to apartment.yaml later, it shows up wherever its room is shown)
 const seenApt = new Set(ui.seen || []);
 const collapsed = new Set(ui.collapsed || []);     // collapsed tree nodes: a room's id, or "<room id>/<folder>"
+if (!ui.sceneLighting) {
+  collapsed.add(sceneLightKey);
+  // Older versions hid all the scene lights with the kitchen. Keep individual light settings in other cases.
+  if (hid.has(shellId(MAIN)) && MAIN.objects.filter(o => !isGroup(o)).every(o => hid.has(o.id))) {
+    sceneLights.forEach(o => hid.delete(o.id));
+  }
+}
 R.apartment.forEach(r => {
   if (!seenApt.has(shellId(r))) { hid.add(shellId(r)); collapsed.add(r.id); }
   r.objects.forEach(i => { if (!seenApt.has(i.id) && hid.has(shellId(r))) hid.add(i.id); });
@@ -327,8 +379,8 @@ function saveUi() {                                // debounced: camera 'change'
   saveTimer = setTimeout(() => {
     try {
       localStorage.setItem(UKEY, JSON.stringify({
-        view, isOrtho, sel, solid: [...solid], cut: cutDeg, ao, speed, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
-        hidden: [...hid], collapsed: [...collapsed], seen: aptIds,
+        view, isOrtho, sel, solid: [...solid], cut: cutDeg, fov: persp.fov, ao, light: lightMode, speed, zones: zoneGroup.visible, labels: !document.body.classList.contains('hide-labels'),
+        hidden: [...hid], collapsed: [...collapsed], seen: aptIds, sceneLighting: true,
         cam: { p: camera.position.toArray(), t: controls.target.toArray(), z: camera.zoom },
       }));
     } catch { /* not persisted */ }
@@ -341,13 +393,21 @@ function saveUi() {                                // debounced: camera 'change'
 // against has changed since (YAML wins).
 R.holes.forEach(h => { h.label = (h.kind === 'window' ? 'Окно' : 'Проём') + ' · ' + h.id; h.room = MAIN.id; });
 const KEYS = { hole: ['position', 'width', 'height', 'sill', 'mullion'],                                     // mullion: windows
-  object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'leg',
-           'doors', 'panel', 'stand'] };   // rails*: type portal / slats, leg: type table, doors: any box, panel / stand: type tv
+  object: ['position', 'gap', 'elevation', 'rotation', 'width', 'depth', 'height', 'top', 'rails', 'rail_width', 'rail_thickness', 'shelves', 'board', 'plinth', 'leg',
+           'doors', 'panel', 'stand', 'lumens', 'lumens_m', 'kelvin', 'beam',
+           'illuminance', 'altitude', 'azimuth', 'luminance', 'overcast', 'kelvin_overcast', 'reflectance'] };   // rails*: type portal / slats, shelves / board / plinth: type shelf, leg: type table, doors: any box, panel / stand: type tv, lumens / kelvin / beam: type light / bulb, lumens_m: type strip, the rest: type sun / sky / bounce
 const kindOf = it => it.kind ? 'hole' : 'object';
+// a light that can cast shadows (the sun, a downlight, a bulb) or a group of such lamps: `shadow: false` switches its shadows off
+const SHADOW_TYPES = ['sun', 'light', 'bulb'];
+const castsShadow = it => SHADOW_TYPES.includes(it.type) || isGroup(it) && OBJECTS.some(o => o.parent === it.id && SHADOW_TYPES.includes(o.type));
 const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
 const underSel = o => { for (let x = o; x; x = x.parent && byId(x.parent)) if (x.id === sel) return true; return false; };   // the selected item or a container above it
-const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...(hasColor(it) ? ['color'] : []), ...Object.keys(it.params || {})];
+const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...(hasColor(it) ? ['color'] : []), ...(it.type === 'shelf' ? ['inner', 'led'] : []), ...(castsShadow(it) ? ['shadow'] : []), ...(hasFinish(it) ? ['finish'] : []), ...Object.keys(it.params || {})];
+// what an object is made of, for the photoreal render (render_mode.js): any object with a body - not openings, containers, light sources
+function hasFinish(it) { return !it.kind && !isGroup(it) && !LIGHT_TYPES.includes(it.type); }
+const FINISHES = [['auto', 'как во вьюере / по типу'], ['fabric', 'ткань'], ['wood', 'дерево'], ['plastic', 'пластик'], ['paint', 'матовая краска'],
+  ['satin', 'сатиновый лак'], ['gloss', 'глянцевый лак'], ['metal', 'металл'], ['chrome', 'хром'], ['stone', 'камень']];
 all().forEach(it => {
   it.def = {};
   keysOf(it).forEach(k => { const v = it.params?.[k] ? it.params[k].value : it[k]; if (v != null) it.def[k] = v; });
@@ -451,23 +511,35 @@ if (SERVER) {
   setSaved('bad', '⚠ Нет связи с сервером сохранения: правки останутся только в этом браузере и в YAML НЕ попадут. Запустите tools/room3d/serve.py и обновите страницу.');
 }
 
-// Everything stands on a wall: `position`/`width` run along it, `gap`+`depth` go from it into the room, so a
-// change of any size can never detach an item from its wall. Limits are shared with the sliders (rangeOf).
-const perpOf = (room, w) => {                      // room size across that wall (its bounding box)
-  const xs = room.edges.map(e => e.a[0]), ys = room.edges.map(e => e.a[1]);
-  return Math.abs(w.dx) > .5 ? Math.max(...ys) - Math.min(...ys) : Math.max(...xs) - Math.min(...xs);
+// An object is placed by coordinates in the wall's frame: `position` runs along the wall (from its first corner), `gap` goes from the
+// wall into the room; there is NO snapping, clearance or collision check against the walls - an object can stand anywhere (even outside
+// the room). Only openings (door / window) are bound to their wall. Limits are shared with the sliders (rangeOf).
+const extentOf = (room, w) => {                    // the room's reach in the wall's frame: u along the wall, t from it into the room
+  let u0 = 0, u1 = w.L, t0 = 0, t1 = 0;
+  room.edges.forEach(e => [e.a, e.b].forEach(p => {
+    const px = p[0] - w.a[0], py = p[1] - w.a[1], u = px * w.dx + py * w.dy, t = -(px * w.nx + py * w.ny);
+    u0 = Math.min(u0, u); u1 = Math.max(u1, u); t0 = Math.min(t0, t); t1 = Math.max(t1, t);
+  }));
+  return { u0, u1, t0, t1 };
 };
+const LIGHT_RANGE = { lumens: [50, 3000], lumens_m: [100, 3000], beam: [15, 120], illuminance: [5000, 110000], altitude: [3, 80],
+  azimuth: [-85, 85], luminance: [300, 15000], overcast: [200, 10000], kelvin_overcast: [4000, 12000], reflectance: [0, 85] };
+const kelvinRange = it => it.type === 'sun' ? [2000, 7000] : it.type === 'sky' ? [4000, 12000] : [1800, 6500];
 const rangeOf = (it, k) => {
-  if (!it.wall) return [0, 1000];                  // a container has no wall
-  const w = edgeOf(it), L = w.L, perp = perpOf(roomById(it.room), w);
+  if (!it.wall) return k === 'kelvin' ? kelvinRange(it) : LIGHT_RANGE[k] || [0, 1000];   // a container / the sun / the sky have no wall
+  const w = edgeOf(it), L = w.L, ex = extentOf(roomById(it.room), w), PAD = 100, big = Math.max(L, ex.u1 - ex.u0, ex.t1 - ex.t0);
   return ({
-    position: [0, L - it.width], width: [it.kind ? 10 : 1, L], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
-    sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, perp - it.gap],
+    position: it.kind ? [0, L - it.width] : [ex.u0 - PAD, ex.u1 + PAD],   // an object: anywhere in (and a bit around) the room; an opening: on its wall
+    width: [it.kind ? 10 : 1, it.kind ? L : big], height: [it.kind ? 10 : 1, H - (it.elevation || 0)],
+    sill: [0, H - it.height], elevation: [0, H - it.height], depth: [1, big],
     rotation: [0, 359],                                       // degrees clockwise seen from above, about the centre of the box
-    gap: [-(it.depth + 40), perp - it.depth], top: [0, 10],   // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
+    gap: [ex.t0 - PAD, ex.t1 + PAD], top: [0, 10],            // gap < 0: sunk into / behind the wall (a niche, a door leaf in the wall)
     rails: [1, 80], rail_width: [.5, (it.type === 'slats' ? it.width : it.depth) / it.rails], rail_thickness: [.5, Math.min(it.width / 2, it.height)],
     leg: [1, Math.min(it.width, it.depth) / 2],
+    shelves: [0, 30], board: [.5, 5], plinth: [0, 30],
     mullion: [10, it.width - 10], doors: [0, 12], panel: [.5, it.depth], stand: [0, it.height - 10],
+    ...LIGHT_RANGE, kelvin: kelvinRange(it),
+    ...(it.type === 'shelf' ? { lumens_m: [0, 3000] } : {}),   // 0 = the shelf lights are off
   })[k];
 };
 // ---------- undo / redo of document changes (item sizes and positions, hidden objects; not the camera) ----------
@@ -505,14 +577,136 @@ function applyPatch(it, patch) {
 }
 function setField(it, k, v) {
   record(it.id + '.' + k);
-  applyPatch(it, { [k]: k === 'rails' || k === 'doors' ? Math.round(v) : v });
+  applyPatch(it, { [k]: ['rails', 'doors', 'shelves'].includes(k) ? Math.round(v) : v });
 }
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7f72, .5));
-const sun = new THREE.DirectionalLight(0xfff4e6, 2.4);
+// ---------- lighting (scene setting «Свет»: Солнце / Пасмурно / Вечер) ----------
+// Sun, sky and bounce are scene settings. Lamps are objects of their rooms. All settings are saved in YAML:
+//   type: sun    - the sun: illuminance of its beam (lx), kelvin, altitude and azimuth (degrees; azimuth off the window's normal)
+//   type: sky    - the sky seen through a window (`window:`, none = every window): luminance (cd/m2) and kelvin, clear and overcast
+//   type: bounce - inter-reflections: the room's mean reflectance (%)
+//   type: light / strip / bulb - downlights, LED strips, a bare hanging bulb: lumens (per metre for a strip), kelvin
+// «Солнце» = sun + clear sky, «Пасмурно» = overcast sky, «Вечер» = the lamps (dark outside). Direct light: the sun (shadowed by the
+// walls and the ceiling, so it comes in through the windows only), an area light in each window (the sky), an area light on the
+// sunlit floor patch facing up (its first bounce), the lamps. The indirect light of all of them is the integrating-sphere estimate
+// E = flux x rho / (room surface x (1 - rho)), spread by a hemisphere light (from the ceiling above, from the floor below) and the
+// environment map: a sunlit room is flooded with light. Scene units = lux x LUX; the camera is an eye that adapts only partly
+// (exposure = (E_REF / E)^ADAPT), so the sunny room stays brighter than the overcast one and the evening darker than both.
+RectAreaLightUniformsLib.init();
+const LUX = .01, E_REF = 260, ADAPT = .78, GLASS = .7;   // GLASS: light transmittance of a double-glazed unit
+const MODES = {
+  sun:   { wb: 5600, bg: [0xf4f1ec, 0x1c1d1f], sun: true,  sky: 'clear',    lamps: false },
+  cloud: { wb: 6500, bg: [0xe7e9eb, 0x1c1e21], sun: false, sky: 'overcast', lamps: false },
+  night: { wb: 3600, bg: [0x262a36, 0x15171e], sun: false, sky: null,       lamps: true },
+};
+let lightMode = MODES[ui.light] ? ui.light : 'sun';
+// black-body colour (Tanner Helland's fit, sRGB) -> linear; seen by a camera white-balanced to `wb` kelvin, brightest channel = 1
+function kelvinRGB(k) {
+  const t = k / 100;
+  const r = t <= 66 ? 255 : 329.698727446 * Math.pow(t - 60, -0.1332047592);
+  const g = t <= 66 ? 99.4708025861 * Math.log(t) - 161.1195681661 : 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  return new THREE.Color().setRGB(...[r, g, b].map(v => clamp(v, 0, 255) / 255), THREE.SRGBColorSpace);
+}
+function lightColor(k, wb) {
+  const c = kelvinRGB(k), w = kelvinRGB(wb);
+  c.r /= w.r; c.g /= w.g; c.b /= w.b;
+  return c.multiplyScalar(1 / Math.max(c.r, c.g, c.b));
+}
+const FLOOR_TINT = new THREE.Color('#c8a488');     // the laminate's colour: what the floor bounces back
+const FLOOR_ALBEDO = .3;
+const LAMP_SHADOWS = Math.max(0, renderer.capabilities.maxTextures - 8);   // a shadow map is a texture unit each: leave room for the materials' own
+const envOf = t => sceneLights.find(o => o.type === t && !hid.has(o.id));
+
+const hemi = new THREE.HemisphereLight(); scene.add(hemi);   // the indirect light
+const sun = new THREE.DirectionalLight();
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
-scene.add(sun);
+sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+const daylight = [], lamps = [];                   // area lights of the windows, the lamps' lights: rebuilt with the room
+let shadowDirty = true;
+let lightInfo = {};                                // the numbers of the last applyMode: flux into the room, indirect lux, exposure
+
+// ---------- shadows of the area lights (LED strips under the cabinets, shelf lights) ----------
+// three.js area lights (RectAreaLight) cast no shadows at all: a strip under a wall cabinet lit the wall behind the shelving unit
+// next to it, straight through the unit. Shadow maps are out (every one is a texture unit, the 8 left are the lamps'), so the lamps'
+// area lights are shadowed analytically: every lit point tests the segments to 3 points along the light (its middle and both ends,
+// a soft edge) against the world boxes (AABB) of the room's solid objects. The boxes of each light are picked on the CPU (near it,
+// not containing it: a shelf light is not shadowed by its own shelf, which it sits in); the window's area lights (sky, sunlit floor)
+// stay unshadowed. Shader: the lights chunk scales each area light's contribution by that visibility (patched below).
+const OCC_L = 12, OCC_B = 24, OCC_REACH = 3;        // lights, boxes (a 24-bit mask per light), metres around a light
+const OCC = { occN: { value: 0 }, occPos: { value: Array.from({ length: OCC_L }, () => new THREE.Vector3()) },
+  occMask: { value: new Array(OCC_L).fill(0) }, occMin: { value: Array.from({ length: OCC_B }, () => new THREE.Vector3()) },
+  occMax: { value: Array.from({ length: OCC_B }, () => new THREE.Vector3()) } };
+const OCC_CALL = 'RE_Direct_RectArea( rectAreaLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );';
+if (THREE.ShaderChunk.lights_fragment_begin.includes(OCC_CALL)) {
+  THREE.ShaderChunk.lights_fragment_begin = THREE.ShaderChunk.lights_fragment_begin.replace(OCC_CALL, `{
+    vec3 occD = reflectedLight.directDiffuse, occS = reflectedLight.directSpecular;
+    ${OCC_CALL}
+    float occV = occVisibility( rectAreaLight.position, rectAreaLight.halfWidth, geometryPosition, geometryNormal );
+    reflectedLight.directDiffuse = occD + ( reflectedLight.directDiffuse - occD ) * occV;
+    reflectedLight.directSpecular = occS + ( reflectedLight.directSpecular - occS ) * occV;
+  }`);
+  THREE.ShaderChunk.lights_pars_begin += `
+#define OCC_L ${OCC_L}
+#define OCC_B ${OCC_B}
+uniform int occN;
+uniform vec3 occPos[ OCC_L ];
+uniform int occMask[ OCC_L ];
+uniform vec3 occMin[ OCC_B ];
+uniform vec3 occMax[ OCC_B ];
+bool occHit( vec3 o, vec3 d, vec3 bmin, vec3 bmax ) {          // the segment o .. o + d crosses the box
+  vec3 inv = 1.0 / ( d + vec3( 1e-6 ) ), t0 = ( bmin - o ) * inv, t1 = ( bmax - o ) * inv;
+  vec3 tn = min( t0, t1 ), tf = max( t0, t1 );
+  float a = max( max( tn.x, tn.y ), tn.z ), b = min( min( tf.x, tf.y ), tf.z );
+  return a <= b && b > 0.0 && a < 1.0;
+}
+float occVisibility( vec3 lightView, vec3 halfWidthView, vec3 posView, vec3 normalView ) {
+  if ( occN == 0 ) return 1.0;
+  mat3 toW = transpose( mat3( viewMatrix ) ); vec3 t = viewMatrix[ 3 ].xyz;
+  vec3 lp = toW * ( lightView - t );
+  int li = -1;
+  for ( int i = 0; i < OCC_L; i ++ ) { if ( i >= occN ) break; if ( distance( occPos[ i ], lp ) < 0.003 ) { li = i; break; } }
+  if ( li < 0 ) return 1.0;                                     // not a lamp's area light (a window): unshadowed
+  int mask = occMask[ li ];
+  vec3 p = toW * ( posView - t ) + toW * normalView * 0.01, hw = toW * halfWidthView * 0.8;   // 1 cm off the surface
+  float vis = 0.0;
+  for ( int s = -1; s <= 1; s ++ ) {
+    vec3 d = lp + hw * float( s ) - p; bool hit = false;
+    for ( int b = 0; b < OCC_B; b ++ ) {
+      if ( ( ( mask >> b ) & 1 ) == 0 ) continue;
+      if ( occHit( p, d, occMin[ b ], occMax[ b ] ) ) { hit = true; break; }
+    }
+    vis += hit ? 0.0 : 1.0;
+  }
+  return vis / 3.0;
+}
+`;
+  [THREE.MeshStandardMaterial, THREE.MeshPhysicalMaterial].forEach(M => {
+    M.prototype.onBeforeCompile = shader => Object.assign(shader.uniforms, OCC);
+  });
+} else console.warn('area-light shadows: three.js lights chunk changed, the strips stay unshadowed');
+// only truly box-shaped objects shade: the shelving unit and the kitchen cabinets / panels (not models: a chair or the sink as a
+// solid box cast square shadows; not the bar table, which is a kitchen: true slab on legs)
+const occluder = o => o.type === 'shelf' || !o.type && o.kitchen && !o.model;
+function updateOcclusion() {
+  const own = new Map();                                       // object id -> its meshes
+  root.updateMatrixWorld(true);
+  root.traverse(m => { if (m.isMesh && m.userData.id) (own.get(m.userData.id) || own.set(m.userData.id, []).get(m.userData.id)).push(m); });
+  const boxes = MAIN.objects.filter(o => occluder(o) && !hid.has(o.id) && own.has(o.id)).map(o => {
+    const b = new THREE.Box3(); own.get(o.id).forEach(m => b.expandByObject(m)); return b;
+  }).filter(b => !b.isEmpty());
+  const ls = lamps.filter(l => l.isRectAreaLight).slice(0, OCC_L).map(l => l.getWorldPosition(new THREE.Vector3()));
+  const near = ls.map(p => boxes.map((b, i) => ({ i, d: b.distanceToPoint(p) }))
+    .filter(({ i, d }) => d < OCC_REACH && !boxes[i].clone().expandByScalar(.01).containsPoint(p)));
+  const pickB = [...new Set(near.flat().sort((a, b) => a.d - b.d).map(x => x.i))].slice(0, OCC_B);   // the boxes nearest to some light
+  OCC.occN.value = ls.length;
+  ls.forEach((p, k) => {
+    OCC.occPos.value[k].copy(p);
+    OCC.occMask.value[k] = near[k].reduce((m, { i }) => pickB.includes(i) ? m | 1 << pickB.indexOf(i) : m, 0);
+  });
+  pickB.forEach((i, k) => { OCC.occMin.value[k].copy(boxes[i].min); OCC.occMax.value[k].copy(boxes[i].max); });
+}
 
 // ---------- room outline ----------
 const pts = R.walls.map(w => w.a);
@@ -552,16 +746,23 @@ const floor = new THREE.Mesh(new THREE.ShapeGeometry(floorShape),
   new THREE.MeshStandardMaterial({ map: plank, roughness: .5 }));
 floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
 scene.add(floor);
-// ceilings: the same outline as the floor at the ceiling height, drawn from below only (BackSide) and without casting shadows
-// (the sun must still light the room). They disappear while the camera is above them (updateWalls).
-const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf6f3ee, roughness: .95, side: THREE.BackSide, emissive: 0xf6f3ee, emissiveIntensity: .3 });   // a little emissive: the underside gets no sun
+// floor inside a doorway: a room's floor stops at the inner face of its walls, so without this there is a slot as deep as
+// the wall under every door between two rooms. A patch on the outline `poly` (cm, plan) in the given floor material; plan
+// coordinates as UV, so the planks run on from the floor without a seam.
+const thresholdPatch = (poly, mat) => {
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(poly.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))), mat);
+  m.rotation.x = -Math.PI / 2; m.receiveShadow = true;
+  return m;
+};
+// ceilings: the same outline as the floor at the ceiling height, drawn from below only (BackSide), so they are not seen from
+// above; they do cast shadows: the sun comes in through the windows only.
+const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf6f3ee, roughness: .95, side: THREE.BackSide, shadowSide: THREE.DoubleSide });
 const makeCeiling = shape => {
   const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), ceilMat);
-  m.rotation.x = -Math.PI / 2; m.position.y = R.ceiling * S; m.receiveShadow = true;
+  m.rotation.x = -Math.PI / 2; m.position.y = R.ceiling * S; m.receiveShadow = true; m.castShadow = true;   // it keeps the sun out from above
   return m;
 };
 const ceiling = makeCeiling(floorShape); scene.add(ceiling);
-const aptCeilings = [];
 
 const T = R.thickness, H = R.ceiling;
 const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xf3f0ea, roughness: .95 });
@@ -570,9 +771,37 @@ const root = new THREE.Group(); scene.add(root);   // walls, openings, objects: 
 function clearRoot() {
   // CSS2DRenderer only drops the DOM label of an object removed directly from its parent, not of one inside a removed group
   root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
-  reflectors.splice(0).forEach(m => m.rt.dispose());                                   // TV mirrors: their render targets
+  reflectors.splice(0).forEach(m => m.dispose());                                   // TV mirrors: their render targets
   root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); [o.material].flat().forEach(m => m?.dispose()); } });   // model meshes are reused
-  root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0; aptCeilings.length = 0;
+  root.traverse(o => { if (o.isLight) o.dispose(); });                                // spots' shadow maps
+  root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0; daylight.length = 0; lamps.length = 0;
+}
+
+// The selection is an overlay: the orange outline of the selected wall / opening / object (and its size label), drawn on top of
+// the scene that is already built. A click therefore adds a few lines and nothing else; build() (all geometry, lights, shadow
+// maps - about a second) runs for edits only, and calls this at its end because it throws the old outline away with the scene.
+const selNodes = [];
+function applySelection() {
+  selNodes.splice(0).forEach(n => {
+    n.traverse(o => { if (o.isCSS2DObject) o.element.remove(); o.geometry?.dispose(); o.material?.dispose?.(); });
+    n.removeFromParent();
+  });
+  if (!sel) return;
+  const it = byId(sel);
+  if (wallRow(sel) || it?.kind) {                      // a wall (several boxes with one id) or an opening (its invisible pick box)
+    pickables.filter(m => m.userData.id === sel).forEach(m => {
+      const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
+      l.renderOrder = 10; m.add(l); selNodes.push(l);
+    });
+    return;
+  }
+  ROOMS.forEach(room => room.objects.forEach(o => {   // an object, or every object inside the selected container
+    const w = edgeOf(o);
+    if (!w || hid.has(o.id) || !underSel(o)) return;
+    const n0 = root.children.length;
+    selectionBox(o, w); spin(o, w, n0);
+    selNodes.push(...root.children.slice(n0));
+  }));
 }
 
 function boxBetween(u0, u1, z0, z1, w, mat) {
@@ -599,7 +828,7 @@ R.walls.forEach((w, i) => {
 function build() {
   clearRoot();
   const showMain = !hid.has(shellId(MAIN));          // floor + walls + openings of this room; its objects have their own eyes
-  floor.visible = showMain;
+  floor.visible = ceiling.visible = showMain;
   if (showMain) buildRoomLabels(MAIN);
   R.walls.forEach((w, i) => {
     if (!showMain) return;
@@ -624,7 +853,6 @@ function build() {
         const m = boxBetween(a, b, z0, Math.min(z1, H), w, mat);
         if (!m) return;
         m.userData.id = wid; grp.add(m); pickables.push(m);
-        if (wid === sel) outline(m);
       });
     }
     root.add(grp); wallGroups.push(grp);
@@ -644,15 +872,16 @@ function build() {
       const pk = new THREE.Mesh(new THREE.BoxGeometry(h.width * S, h.height * S, (T + 4) * S), new THREE.MeshBasicMaterial({ visible: false }));
       pk.position.copy(at); pk.rotation.y = rotY; pk.userData.id = h.id;
       grp.add(pk); pickables.push(pk);
-      if (h.id === sel) {                                  // orange outline of the selected opening
-        const hl = new THREE.LineSegments(new THREE.EdgesGeometry(pk.geometry), new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
-        hl.position.copy(at); hl.rotation.y = rotY; hl.renderOrder = 10;
-        grp.add(hl);
-      }
       if (h.kind === 'window') {
         buildWindow(h, w, grp);
         wallLabel(`${h.id} · ${r1(h.width)}×${r1(h.height)}, подоконник ${r1(h.sill)}`, P(base[0] - w.nx * 10, base[1] - w.ny * 10, h.sill + h.height + 8), 'hole');
       } else {
+        // the floor runs on through the wall thickness (not part of grp: the cutaway hides the wall, not the floor)
+        const p0 = [w.a[0] + w.dx * h.u0, w.a[1] + w.dy * h.u0], p1 = [w.a[0] + w.dx * h.u1, w.a[1] + w.dy * h.u1];
+        const slot = [p0, p1, [p1[0] + w.nx * T, p1[1] + w.ny * T], [p0[0] + w.nx * T, p0[1] + w.ny * T]];
+        root.add(thresholdPatch(slot, floor.material));
+        // an opening up to the ceiling (no lintel over it, e.g. door-1 under the portal): the ceiling runs on through the wall too
+        if (h.sill + h.height >= H) root.add(makeCeiling(new THREE.Shape(slot.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))));
         wallLabel(`${h.id} · ${r1(h.width)}×${r1(h.height)}${h.to ? ' → ' + h.to : ''}`, P(base[0] - w.nx * 10, base[1] - w.ny * 10, h.height + 8), 'hole');
       }
     });
@@ -661,18 +890,60 @@ function build() {
   // objects[] of every room (same format everywhere): standing on a wall (position/width along it, gap+depth into the room).
   // A label only on the selected one, to keep the scene readable.
   const placeObject = (room, o, w) => {
-    const picked = underSel(o);
+    const picked = false;                              // the selection outline is applySelection()'s, not build()'s
     if (o.type === 'portal') return placePortal(o, w, picked);
     if (o.type === 'slats') return placeSlats(o, w, picked);
+    if (o.type === 'shelf') return placeShelf(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
     if (o.type === 'tv') return placeTv(o, w, picked);
     if (o.type === 'radiator') return placeRadiator(o, w, picked);
     if (o.type === 'rug') return placeRug(o, w, picked);
+    if (o.type === 'light') return placeLight(o, w, picked);
+    if (o.type === 'strip') return placeStrip(o, w, picked);
+    if (o.type === 'bulb') return placeBulb(o, w, picked);
     if (o.model && models[o.model]) return placeModel(o, w, picked);
     // other objects that ask for a cut-out in this one (a sink in the worktop): rectangles in wall coordinates
-    const cuts = room.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id)).map(c => ({
+    const cuts = room.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id) && !(+c.cutout.height > 0)).map(c => ({
       u: c.position + c.width / 2, t: c.gap + c.depth / 2, w: +c.cutout.width || c.width - 4, d: +c.cutout.depth || c.depth - 4 }));
-    const box = (depth, z, h, color, rough = .6) => {
+    // `cutout` with a height = a niche open to the front (an oven in a base cabinet): cutout {in, width, depth, height}, centred on
+    // that object; the body and the front panel of the cabinet are cut into boxes around it (local x along the wall from the
+    // cabinet's position, t from its gap, z absolute)
+    const niches = room.objects.filter(c => c.cutout?.in === o.id && c.wall === o.wall && !hid.has(c.id) && +c.cutout.height > 0).map(c => {
+      const cw = +c.cutout.width || c.width + .6, cd = +c.cutout.depth || c.depth, ch = +c.cutout.height, cx = c.position + c.width / 2 - o.position;
+      return { x0: cx - cw / 2, x1: cx + cw / 2, t0: o.depth - cd, t1: o.depth + 10, z0: c.elevation + c.height / 2 - ch / 2, z1: c.elevation + c.height / 2 + ch / 2 };
+    });
+    const hits = (b, n) => b.x0 < n.x1 && b.x1 > n.x0 && b.t0 < n.t1 && b.t1 > n.t0 && b.z0 < n.z1 && b.z1 > n.z0;
+    const minus = (b, n) => {                         // the box b without the niche n: up to 6 boxes
+      if (!hits(b, n)) return [b];
+      const out = [], z0 = Math.max(b.z0, n.z0), z1 = Math.min(b.z1, n.z1);
+      if (b.z0 < n.z0) out.push({ ...b, z1: n.z0 });
+      if (b.z1 > n.z1) out.push({ ...b, z0: n.z1 });
+      if (b.x0 < n.x0) out.push({ ...b, x1: n.x0, z0, z1 });
+      if (b.x1 > n.x1) out.push({ ...b, x0: n.x1, z0, z1 });
+      const x0 = Math.max(b.x0, n.x0), x1 = Math.min(b.x1, n.x1);
+      if (b.t0 < n.t0) out.push({ ...b, x0, x1, t1: n.t0, z0, z1 });
+      if (b.t1 > n.t1) out.push({ ...b, x0, x1, t0: n.t1, z0, z1 });
+      return out;
+    };
+    const carve = b => niches.reduce((bs, n) => bs.flatMap(x => minus(x, n)), [b]);
+    const pieces = (b, color, rough, anchor) => carve(b).map(q => {
+      const g = new THREE.BoxGeometry((q.x1 - q.x0) * S, (q.z1 - q.z0) * S, (q.t1 - q.t0) * S);
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: rough }));
+      const u = o.position + (q.x0 + q.x1) / 2, t = o.gap + (q.t0 + q.t1) / 2;
+      m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, (q.z0 + q.z1) / 2));
+      m.rotation.y = Math.atan2(w.dy, w.dx); m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
+      root.add(m); pickables.push(m);
+      return m;
+    });
+    const box = (depth, z, h, color, rough = .6, gloss = false) => {
+      if (niches.some(n => hits({ x0: 0, x1: o.width, t0: 0, t1: depth, z0: z, z1: z + h }, n))) {   // a niche cuts it: separate boxes
+        pieces({ x0: 0, x1: o.width, t0: 0, t1: depth, z0: z, z1: z + h }, color, rough);
+        const a = new THREE.Object3D(), u = o.position + o.width / 2, t = o.gap + depth / 2;    // holds the size label
+        a.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, z + h / 2)); a.rotation.y = Math.atan2(w.dy, w.dx);
+        root.add(a);
+        if (picked) selectionBox(o, w);
+        return a;
+      }
       const u = o.position + o.width / 2, t = o.gap + depth / 2;                 // inward = -outward normal
       let g = new THREE.BoxGeometry(o.width * S, h * S, depth * S);
       if (cuts.length) {
@@ -692,7 +963,7 @@ function build() {
           g.rotateX(-Math.PI / 2); g.translate(0, -h * S / 2, 0);              // (x, y) -> (x, up, -y), centred like the box
         }
       }
-      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, roughness: rough }));
+      const m = new THREE.Mesh(g, surface(color, rough, gloss));
       m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, z + h / 2));
       m.rotation.y = Math.atan2(w.dy, w.dx);
       m.castShadow = true; m.receiveShadow = true; m.userData.id = o.id;
@@ -703,13 +974,20 @@ function build() {
       return m;
     };
     const pal = palOf(o);
-    const body = box(o.depth, o.elevation, o.height, o.kitchen === true ? pal.carcass : o.color || (o.kitchen && pal.carcass));
+    if (o.gloss && !o.kitchen) {                       // a glossy plain box (hob): its top face is a mirror too
+      const g = localFrame(o, w), m = glassMirror(o, w, g, new THREE.PlaneGeometry(o.width * S, o.depth * S), 1024, o.depth / o.width);
+      m.rotation.x = -Math.PI / 2; m.position.set(0, (o.height + .08) * S, 0);
+    }
+    const body = box(o.depth, o.elevation, o.height, o.kitchen === true ? pal.carcass : o.color || (o.kitchen && pal.carcass), .6, !!o.gloss);
     if (o.top) box(o.depth + 2, o.elevation + o.height, o.top, pal.worktop, .3);   // countertop, 2 cm front overhang
     if (o.kitchen === true) {                        // kitchen: panel = a plain board in the carcass colour, no front
       // front panel (1.8 cm), 2 mm smaller than the body all round, so a thin carcass edge shows, 1 mm proud of it.
       // facade_side: front (default, the room side) | start / end (the side facing the wall's first / second corner,
       // e.g. a peninsula whose doors face the kitchen run)
       const side = o.facade_side || 'front', across = side !== 'front';
+      if (niches.length && !across) {                 // the front panel with the niche cut out
+        pieces({ x0: .2, x1: o.width - .2, t0: o.depth - 1.7, t1: o.depth + .1, z0: o.elevation + .2, z1: o.elevation + o.height - .2 }, pal.facade, .45);
+      } else {
       const g = across ? new THREE.BoxGeometry(1.8 * S, (o.height - .4) * S, (o.depth - .4) * S)
                        : new THREE.BoxGeometry((o.width - .4) * S, (o.height - .4) * S, 1.8 * S);
       const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: pal.facade, roughness: .45 }));
@@ -719,6 +997,7 @@ function build() {
       m.rotation.y = Math.atan2(w.dy, w.dx);
       m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
       root.add(m); pickables.push(m);
+      }
     }
     if (o.doors >= 1 && !o.kitchen) {                // N equal doors over the front, 3 mm apart, 2 mm in from the body edges
       const n = Math.round(o.doors), gp = .3, dw = (o.width - .4 - gp * (n - 1)) / n;
@@ -733,10 +1012,6 @@ function build() {
         root.add(m); pickables.push(m);
       }
     }
-    if (o.id === sel) {
-      const l = makeLabel(`${o.label} · ${r1(o.width)}×${r1(o.depth)}×${r1(o.height)}`, 'hole');
-      l.position.set(0, (o.height + (o.top || 0)) * S / 2 + .08, 0); body.add(l);
-    }
   };
   ROOMS.forEach(room => room.objects.forEach(o => {
     const w = edgeOf(o);
@@ -746,6 +1021,8 @@ function build() {
     spin(o, w, n0);
   }));
   R.apartment.forEach(buildRoomShell);
+  buildDaylight(); applyMode(); updateOcclusion();
+  applySelection();
 }
 
 // ---------- window: white PVC frame, mullion, fixed pane / opening sash, double glazing, sill with ears ----------
@@ -833,10 +1110,6 @@ function buildRoomLabels(room) {
 // Plan boxes are [x0, y0, x1, y1] (+ [z0, z1]) in this room's frame. Walls do not cast shadows, so showing
 // the flat never darkens the room being designed; they take part in the cutaway (updateWalls).
 // orange outline of the selected wall, drawn on top
-const outline = m => {
-  const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
-  l.renderOrder = 10; m.add(l);
-};
 const planBox = (b, z0, z1, mat) => {
   const [x0, x1] = [Math.min(b[0], b[2]), Math.max(b[0], b[2])], [y0, y1] = [Math.min(b[1], b[3]), Math.max(b[1], b[3])];
   const m = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * S, (z1 - z0) * S, (y1 - y0) * S), mat);
@@ -849,7 +1122,10 @@ function buildRoomShell(r) {
     const fl = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))),
       new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
     fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
-    const ce = makeCeiling(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))); root.add(ce); aptCeilings.push(ce);
+    // a lintel (a wall box that starts above the floor and reaches the ceiling) = a doorway: its floor gets this room's floor
+    r.walls.filter(b => b.length > 4 && b[4] > 0 && b[5] >= R.ceiling).forEach(b =>
+      root.add(thresholdPatch([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], fl.material)));
+    const ce = makeCeiling(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))); root.add(ce);
     const wm = wallMat();
     const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
     // one wall = several boxes with one id and one centre: selected, outlined and cut away together
@@ -860,7 +1136,6 @@ function buildRoomShell(r) {
         m.receiveShadow = true;
         m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
       }
-      if (g.id === sel) outline(m);
     }));
     buildRoomLabels(r);
   }
@@ -887,6 +1162,16 @@ Object.entries(R.models).forEach(([path, uri]) => gltfLoader.load(uri, g => {
 
 // Recolour a model to the object's main colour: its main material gets exactly that colour, the others keep their relation to it
 // (same hue, lightness scaled by the same ratio), so a lighter seat stays lighter. Black parts, metal and glass are left alone.
+// `gloss: true` on an object = the finish of the TV screen: black glass with a clear coat (a hob, an oven front)
+const glossy = new Map();
+const glossMaterial = mat => {
+  if (!glossy.has(mat.uuid)) glossy.set(mat.uuid, new THREE.MeshPhysicalMaterial({
+    color: mat.color, roughness: Math.min(mat.roughness ?? .05, .05), metalness: mat.metalness > .8 ? mat.metalness : 0,
+    clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 1.2 }));
+  return glossy.get(mat.uuid);
+};
+const surface = (color, rough, gloss) => gloss ? new THREE.MeshPhysicalMaterial({ color, roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 1.2 })
+  : new THREE.MeshStandardMaterial({ color, roughness: rough });
 const tinted = new Map();
 function tintMaterial(M, mat, hex) {
   const key = M.dom.uuid + '|' + mat.uuid + '|' + hex;
@@ -907,6 +1192,7 @@ function placeModel(o, w, picked) {
   const M = models[o.model];
   const inner = M.scene.clone(true);                 // shares geometry and materials with the loaded model
   if (o.def?.color && M.dom && o.def.color.toLowerCase() !== M.base) inner.traverse(m => { if (m.isMesh) m.material = tintMaterial(M, m.material, o.def.color); });
+  if (o.gloss) inner.traverse(m => { if (m.isMesh) m.material = glossMaterial(m.material); });
   inner.position.copy(M.center).negate();
   inner.traverse(m => { if (m.isMesh) { m.userData.id = o.id; pickables.push(m); } });
   const fit = new THREE.Group();
@@ -920,6 +1206,11 @@ function placeModel(o, w, picked) {
   holder.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
   holder.add(fit);
   root.add(holder);
+  if (o.gloss && o.mirror) {                          // reflecting glass on the front (an oven door): mirror: {width, height, bottom, back} (cm)
+    const m = o.mirror, g = localFrame(o, w);
+    const mm = glassMirror(o, w, g, new THREE.PlaneGeometry(m.width * S, m.height * S), 1024, m.height / m.width);
+    mm.position.set(0, (m.bottom + m.height / 2) * S, (o.depth / 2 - (m.back ?? 0) + .12) * S);
+  }
   if (picked) selectionBox(o, w);
 }
 
@@ -985,6 +1276,43 @@ function placeSlats(o, w, picked) {
   }
   if (picked) selectionBox(o, w);
 }
+// ---------- shelf: an open shelving unit (bookcase), its open front into the room (type: shelf) ----------
+// width × depth × height outside. Sides full height (to the floor), top, bottom board over a plinth recessed 4 cm (`plinth` high,
+// 0 = none), a thin back panel; `shelves` inner shelves spread evenly between the bottom and the top, `board` = board thickness.
+// color = the carcass (sides, top, bottom, plinth), inner = back panel and shelves. lumens_m > 0: an LED strip under the front edge
+// of every shelf and of the top, lighting the compartment below (an area light facing down, on in the «Вечер» mode, as type: strip).
+function placeShelf(o, w, picked) {
+  const g = localFrame(o, w), W = o.width, D = o.depth, Hh = o.height;
+  const b = clamp(o.board ?? 1.8, .5, Math.min(W / 3, Hh / 4, D / 2)), back = Math.min(.8, b);
+  const pl = clamp(o.plinth ?? 0, 0, Hh / 2), E = .2;
+  const car = new THREE.MeshStandardMaterial({ color: o.color, roughness: .5 });
+  const inn = new THREE.MeshStandardMaterial({ color: o.inner || '#b08b5e', roughness: .6 });
+  const iw = W - 2 * b, z0 = pl + b, z1 = Hh - b, ih = Math.max(0, z1 - z0);
+  [-1, 1].forEach(s => lbox(g, o, b, Hh, D, s * (W - b) / 2, Hh / 2, 0, car, E));          // sides
+  lbox(g, o, iw, b, D, 0, Hh - b / 2, 0, car, E);                                            // top
+  lbox(g, o, iw, b, D, 0, pl + b / 2, 0, car, E);                                            // bottom
+  if (pl > 0) lbox(g, o, iw, pl, b, 0, pl / 2, D / 2 - Math.min(4, D / 4) - b / 2, car, E);   // plinth, recessed
+  if (ih > 0) lbox(g, o, iw, ih, back, 0, (z0 + z1) / 2, -D / 2 + back / 2, inn, E);         // back panel
+  const n = Math.min(Math.max(0, Math.round(o.shelves ?? 4)), Math.floor(ih / (b + 2))), sd = D - back;
+  const step = (ih - n * b) / (n + 1), under = [];                                          // compartment height; undersides of the boards
+  for (let i = 1; i <= n; i++) {
+    const y = z0 + i * step + (i - 1) * b;
+    lbox(g, o, iw, b, sd, 0, y + b / 2, back / 2, inn, E); under.push(y);
+  }
+  under.push(z1);
+  const lm = o.led === false ? 0 : o.lumens_m ?? 0;                       // led: false = the lighting is switched off
+  if (lm > 0 && iw > 1) under.forEach(y => {
+    const dw = 1.2, lensMat = new THREE.MeshStandardMaterial({ color: 0xf4f2ec, roughness: .4, emissive: 0xffffff, emissiveIntensity: 0 });
+    const lens = new THREE.Mesh(new THREE.PlaneGeometry(iw * S, dw * S), lensMat);
+    lens.rotation.x = Math.PI / 2; lens.position.set(0, (y - .05) * S, (D / 2 - 3) * S); lens.userData.id = o.id;   // faces down
+    g.add(lens); pickables.push(lens);
+    const strip = new THREE.RectAreaLight(0xffffff, lm / (dw * S * Math.PI) * LUX, iw * S, dw * S);
+    strip.position.set(0, (y - .1) * S, (D / 2 - 3) * S); strip.rotateX(-Math.PI / 2);     // shining down into the compartment
+    strip.userData = { kelvin: o.kelvin ?? 3000, lens: lensMat, flux: lm * iw / 100 };
+    g.add(strip); lamps.push(strip);
+  });
+  if (picked) selectionBox(o, w);
+}
 // ---------- table: a slab on four square legs, no carcass (type: table) ----------
 // height = to the top surface, top = slab thickness, leg = leg section; legs stand 5 cm in from the slab edges.
 // kitchen: true -> the slab in kitchen_colors.worktop (reads as a continuation of the worktop); legs in `color`.
@@ -1031,64 +1359,54 @@ function lbox(g, o, sx, sy, sz, x, y, z, mat, edges = 0) {           // a box sx
 }
 
 // ---------- TV (type: tv): a thin panel on a pedestal; the screen is a planar mirror tinted almost black ----------
-// The mirror re-renders the scene from the reflected camera, so the room, the window and the light really show in it.
-// Like three.js Reflector, but (1) dark glass MULTIPLIES the reflection (Reflector overlays its tint, so bright things stay
-// bright) and (2) what lies behind the mirror is cut off by a clipping plane instead of Reflector's oblique near plane,
-// which only works for a perspective camera - so the mirror works with the orthographic camera too.
+// The mirror is three.js's own Reflector (it re-renders the scene from the reflected camera, so the room, the window and the light
+// really show in it) with one custom shader: dark glass MULTIPLIES the reflection (the stock shader overlays its tint, so bright things
+// stay bright). Reflector cuts off what lies behind the mirror with an oblique near plane, which only works for a perspective camera:
+// with the orthographic camera the screen is plain dark glass, no reflection.
 const reflectors = [];
 const SCREEN_TINT = .12;                                               // share of the room the screen returns (linear): dark glass
-class Mirror extends THREE.Mesh {
-  constructor(geometry, { width, height }) {
-    const rt = new THREE.WebGLRenderTarget(width, height, { samples: 4, type: THREE.HalfFloatType });
-    super(geometry, new THREE.ShaderMaterial({
-      name: 'ScreenGlass',
-      uniforms: { color: { value: new THREE.Color().setRGB(SCREEN_TINT, SCREEN_TINT, SCREEN_TINT * 1.05) },
-                  tDiffuse: { value: rt.texture }, textureMatrix: { value: new THREE.Matrix4() } },
-      vertexShader: `
-        uniform mat4 textureMatrix;
-        varying vec4 vUv;
-        void main() { vUv = textureMatrix * vec4( position, 1.0 ); gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
-      fragmentShader: `
-        uniform vec3 color;
-        uniform sampler2D tDiffuse;
-        varying vec4 vUv;
-        void main() {
-          gl_FragColor = vec4( texture2DProj( tDiffuse, vUv ).rgb * color, 1.0 );
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-        }`,
-    }));
-    this.rt = rt; this.isMirror = true;
-    const cams = { persp: new THREE.PerspectiveCamera(), ortho: new THREE.OrthographicCamera() };
-    const pos = new THREE.Vector3(), camPos = new THREE.Vector3(), normal = new THREE.Vector3(), view = new THREE.Vector3();
-    const look = new THREE.Vector3(), target = new THREE.Vector3(), dir = new THREE.Vector3(), rot = new THREE.Matrix4();
-    const plane = new THREE.Plane(), tm = this.material.uniforms.textureMatrix.value;
-    this.render = (renderer, scene, camera) => {
-      pos.setFromMatrixPosition(this.matrixWorld); camPos.setFromMatrixPosition(camera.matrixWorld);
-      rot.extractRotation(this.matrixWorld); normal.set(0, 0, 1).applyMatrix4(rot);
-      camera.getWorldDirection(dir);
-      if (dir.dot(normal) >= 0 || (camera.isPerspectiveCamera && view.subVectors(pos, camPos).dot(normal) > 0)) return;   // seen from behind
-      const vc = camera.isOrthographicCamera ? cams.ortho : cams.persp;
-      view.subVectors(pos, camPos).reflect(normal).negate().add(pos);                 // the camera mirrored in the screen plane
-      rot.extractRotation(camera.matrixWorld);
-      look.set(0, 0, -1).applyMatrix4(rot).add(camPos);
-      target.subVectors(pos, look).reflect(normal).negate().add(pos);
-      vc.position.copy(view); vc.up.set(0, 1, 0).applyMatrix4(rot).reflect(normal); vc.lookAt(target);
-      vc.updateMatrixWorld(); vc.projectionMatrix.copy(camera.projectionMatrix); vc.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
-      tm.set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1);
-      tm.multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse).multiply(this.matrixWorld);
-      plane.setFromNormalAndCoplanarPoint(normal, pos); plane.constant += .002;      // keep only what is in front of the screen
-      const was = { rt: renderer.getRenderTarget(), shadow: renderer.shadowMap.autoUpdate, clip: renderer.clippingPlanes };
-      this.visible = false;
-      renderer.shadowMap.autoUpdate = false; renderer.clippingPlanes = [plane];
-      renderer.setRenderTarget(rt); renderer.state.buffers.depth.setMask(true);
-      if (renderer.autoClear === false) renderer.clear();
-      renderer.render(scene, vc);
-      renderer.setRenderTarget(was.rt); renderer.shadowMap.autoUpdate = was.shadow; renderer.clippingPlanes = was.clip;
-      this.visible = true;
-    };
-  }
-  dispose() { this.rt.dispose(); this.geometry.dispose(); this.material.dispose(); }
+const SCREEN_SHADER = {
+  name: 'ScreenGlass',
+  uniforms: Reflector.ReflectorShader.uniforms,
+  vertexShader: Reflector.ReflectorShader.vertexShader,
+  fragmentShader: `
+    uniform vec3 color;
+    uniform sampler2D tDiffuse;
+    varying vec4 vUv;
+    #include <logdepthbuf_pars_fragment>
+    void main() {
+      #include <logdepthbuf_fragment>
+      gl_FragColor = vec4( texture2DProj( tDiffuse, vUv ).rgb * color, 1.0 );
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+};
+// A glass mirror of the TV kind for any glossy surface: `frame` = the object's local frame, `geo` the plane, `px` the width of the
+// render target (a small hob does not need the TV's full-screen one). The wall the object stands on is hidden in the reflection
+// (it lies between the reflected camera and the room).
+let mirrorBusy = false;                                                // one reflection at a time: a mirror seen in another one shows its last frame
+function glassMirror(o, w, frame, geo, px, h2w) {
+  const mirror = new Reflector(geo, {
+    shader: SCREEN_SHADER, color: new THREE.Color().setRGB(SCREEN_TINT, SCREEN_TINT, SCREEN_TINT * 1.05),
+    textureWidth: px, textureHeight: Math.max(64, Math.round(px * h2w)),
+  });
+  const reflect = mirror.onBeforeRender;
+  let blank = false;                                                   // the target holds no stale reflection (orthographic camera)
+  mirror.onBeforeRender = (r, sc, cam) => {
+    if (sc.overrideMaterial || mirrorBusy) return;                     // not again for the AO depth / normal passes, nor inside another mirror
+    if (cam.isOrthographicCamera) {
+      if (!blank) { const was = r.getRenderTarget(); r.setRenderTarget(mirror.getRenderTarget()); r.clear(); r.setRenderTarget(was); blank = true; }
+      return;
+    }
+    blank = false; mirrorBusy = true;
+    const vis = wallGroups.map(g => g.visible);
+    wallGroups.forEach(g => { g.visible = !(o.room === MAIN.id && g.userData.w.id === o.wall); });
+    try { reflect.call(mirror, r, sc, cam); }                         // r187's Reflector reads `this`
+    finally { wallGroups.forEach((g, i) => { g.visible = vis[i]; }); mirrorBusy = false; }
+  };
+  mirror.userData.id = o.id;
+  frame.add(mirror); pickables.push(mirror); reflectors.push(mirror);
+  return mirror;
 }
 function placeTv(o, w, picked) {
   const g = localFrame(o, w);
@@ -1104,18 +1422,8 @@ function placeTv(o, w, picked) {
     new THREE.MeshPhysicalMaterial({ color: 0x030304, roughness: .05, metalness: 0, clearcoat: 1, clearcoatRoughness: .02, envMapIntensity: 1.2 }));
   glass.position.set(0, sy * S, sz * S); glass.userData.id = o.id; g.add(glass); pickables.push(glass);
   const px = Math.min(2048, Math.round(innerWidth * renderer.getPixelRatio()));
-  const mirror = new Mirror(new THREE.PlaneGeometry(sw * S, sh * S), { width: px, height: Math.round(px * sh / sw) });
-  mirror.onBeforeRender = (r, sc, cam) => {
-    if (sc.overrideMaterial) return;                                   // not again for the AO depth / normal passes
-    // the mirror looks back into the room: walls cut away for the main camera (the one behind it) must show in it,
-    // the wall the TV hangs on (between the mirrored camera and the room) must not
-    const vis = wallGroups.map(g => g.visible);
-    wallGroups.forEach(g => { g.visible = !(o.room === MAIN.id && g.userData.w.id === o.wall); });
-    mirror.render(r, sc, cam);
-    wallGroups.forEach((g, i) => { g.visible = vis[i]; });
-  };
-  mirror.position.set(0, sy * S, (sz + .03) * S); mirror.userData.id = o.id;
-  g.add(mirror); pickables.push(mirror); reflectors.push(mirror);
+  const mirror = glassMirror(o, w, g, new THREE.PlaneGeometry(sw * S, sh * S), px, sh / sw);
+  mirror.position.set(0, sy * S, (sz + .03) * S);
   if (picked) selectionBox(o, w);
 }
 
@@ -1249,6 +1557,188 @@ R.lights.forEach(l => {
   }
 });
 
+// ---------- ceiling downlight (type: light): white trim ring + frosted lens flush under the ceiling, a spot pointing down ----------
+// width = diameter, height = the trim's visible thickness, elevation = its underside. The spot is on in the «Вечер» mode only.
+function placeLight(o, w, picked) {
+  const g = localFrame(o, w), d = Math.max(2, o.width), h = Math.max(.3, o.height);
+  const trim = new THREE.Mesh(new THREE.CylinderGeometry(d / 2 * S, d / 2 * S, h * S, 40), new THREE.MeshStandardMaterial({ color: 0xf7f7f5, roughness: .4 }));
+  trim.position.y = h / 2 * S; trim.receiveShadow = true; trim.userData.id = o.id; g.add(trim); pickables.push(trim);
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0xf4f2ec, roughness: .35, emissive: 0xffffff, emissiveIntensity: 0 });
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(d * .36 * S, 40), lensMat);
+  lens.rotation.x = Math.PI / 2; lens.position.y = -.05 * S; lens.userData.id = o.id; g.add(lens); pickables.push(lens);   // faces down
+  // the beam angle of a datasheet is where the light falls to half: the cone is cut a bit wider, its edge soft
+  const half = THREE.MathUtils.degToRad(clamp(o.beam ?? 60, 10, 150) / 2);
+  const spot = new THREE.SpotLight(0xffffff, 1, 0, Math.min(half * 1.4, Math.PI / 2 * .97), .6, 2);
+  spot.intensity = (o.lumens ?? 600) / (2 * Math.PI * (1 - Math.cos(half))) * LUX;           // candela: lumens over the beam's solid angle
+  spot.position.set(0, -1.5 * S, 0); spot.target.position.set(0, -1, 0);
+  // normalBias must stay well under the thinnest board (1.8 cm shelf, side panel): a 2 cm one let the light leak through the joints
+  if (o.shadow !== false && lamps.filter(l => l.castShadow).length < LAMP_SHADOWS) {
+    spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024);
+    spot.shadow.bias = -.0002; spot.shadow.normalBias = .004; spot.shadow.camera.near = .03; spot.shadow.camera.far = 8;
+  }
+  spot.userData = { kelvin: o.kelvin ?? 3000, lens: lensMat, flux: o.lumens ?? 600 };
+  g.add(spot, spot.target); lamps.push(spot);
+  if (picked) selectionBox(o, w);
+}
+
+// ---------- bare bulb on a cord (type: bulb): frosted A60 globe, black E27 socket, cord to a ceiling rose; a point light ----------
+// width = globe diameter, height = the whole bulb, elevation = its bottom. It shines every way, the ceiling too; on in «Вечер» only.
+function placeBulb(o, w, picked) {
+  const g = localFrame(o, w), d = Math.max(2, o.width), h = Math.max(d, o.height), r = d / 2;
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0xf6f4ee, roughness: .25, emissive: 0xffffff, emissiveIntensity: 0 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: .6 });
+  const part = (geo, mat, y, shadow = false) => {
+    const m = new THREE.Mesh(geo, mat); m.position.y = y * S; m.castShadow = shadow; m.receiveShadow = !shadow; m.userData.id = o.id;
+    g.add(m); pickables.push(m); return m;
+  };
+  part(new THREE.SphereGeometry(r * S, 32, 20), glassMat, r);                                        // the globe
+  const neck = h - d, nr = Math.min(1.4, r * .5);                                                    // narrows to the E27 base
+  if (neck > .2) part(new THREE.CylinderGeometry(nr * S, r * .8 * S, neck * S, 24), glassMat, d * .85 + neck / 2 - .15 * r);
+  const sock = 5, top = o.elevation + h + sock, cord = Math.max(0, H - 1.5 - top);
+  part(new THREE.CylinderGeometry(1.8 * S, 1.8 * S, sock * S, 24), black, h + sock / 2, true);       // the socket shades the ceiling right above
+  if (cord > 0) part(new THREE.CylinderGeometry(.25 * S, .25 * S, cord * S, 8), black, h + sock + cord / 2);
+  part(new THREE.CylinderGeometry(4 * S, 4 * S, 1.5 * S, 32), black, H - o.elevation - .75);          // ceiling rose
+  const bulb = new THREE.PointLight(0xffffff, (o.lumens ?? 806) / (4 * Math.PI) * LUX, 0, 2);       // candela of an even sphere
+  bulb.position.y = r * S;
+  if (o.shadow !== false && lamps.filter(l => l.castShadow).length < LAMP_SHADOWS) {
+    bulb.castShadow = true; bulb.shadow.mapSize.set(1024, 1024); bulb.shadow.bias = -.0002; bulb.shadow.normalBias = .005;
+    bulb.shadow.camera.near = .02; bulb.shadow.camera.far = 8;
+  }
+  bulb.userData = { kelvin: o.kelvin ?? 2700, lens: glassMat, glow: 6, flux: o.lumens ?? 806 };
+  g.add(bulb); lamps.push(bulb);
+  if (picked) selectionBox(o, w);
+}
+
+// ---------- LED strip under a wall cabinet (type: strip): aluminium profile, opal diffuser, an area light shining down ----------
+// width = length along the wall, depth / height = the profile, elevation = its underside. On in the «Вечер» mode only.
+// A lambertian emitter of flux F and area A has luminance F / (A pi): F = lumens_m x length, A = length x diffuser width.
+function placeStrip(o, w, picked) {
+  const g = localFrame(o, w), d = Math.max(.5, o.depth), h = Math.max(.2, o.height);
+  const alu = new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: .35, metalness: .7 });
+  const prof = lbox(g, o, o.width, h, d, 0, h / 2, 0, alu);
+  prof.castShadow = false;                                                 // it would shade its own light
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0xf4f2ec, roughness: .4, emissive: 0xffffff, emissiveIntensity: 0 });
+  const dw = d * .7, lens = new THREE.Mesh(new THREE.PlaneGeometry(o.width * S, dw * S), lensMat);
+  lens.rotation.x = Math.PI / 2; lens.position.y = -.05 * S; lens.userData.id = o.id; g.add(lens); pickables.push(lens);   // faces down
+  const strip = new THREE.RectAreaLight(0xffffff, (o.lumens_m ?? 500) / (dw * S * Math.PI) * LUX, o.width * S, dw * S);
+  strip.position.y = -.1 * S; strip.rotateX(-Math.PI / 2);                // width along the wall, shining down
+  strip.userData = { kelvin: o.kelvin ?? 3000, lens: lensMat, flux: (o.lumens_m ?? 500) * o.width / 100 };
+  g.add(strip); lamps.push(strip);
+  if (picked) selectionBox(o, w);
+}
+
+// The sun (type: sun) stands outside its window (`window:`, else the first one): `azimuth` degrees off the window's outward normal
+// (+ = towards the wall's second corner), `altitude` degrees up. Each window gets an area light in its glass (the sky, if a
+// type: sky object covers it) and, if the sun shines in through it, one lying on the sunlit patch of the floor (the glass projected
+// along the rays), facing up: the floor's first bounce.
+function buildDaylight() {
+  daylight.splice(0).forEach(l => { l.removeFromParent(); l.dispose(); });
+  const wins = R.holes.filter(h => h.kind === 'window');
+  const sunO = envOf('sun'), skies = sceneLights.filter(o => o.type === 'sky' && !hid.has(o.id));
+  const sw = wins.find(h => h.id === sunO?.window) || wins[0], w0 = sw ? R.walls.find(w => w.id === sw.wall) : R.walls[R.walls.length - 1];
+  const el = THREE.MathUtils.degToRad(sunO?.altitude ?? 32), az = THREE.MathUtils.degToRad(sunO?.azimuth ?? 0);
+  const hx = Math.cos(el) * (w0.nx * Math.cos(az) + w0.dx * Math.sin(az)), hy = Math.cos(el) * (w0.ny * Math.cos(az) + w0.dy * Math.sin(az)), hz = Math.sin(el);
+  sun.target.position.copy(P(cx, cy, H / 2));
+  sun.position.copy(P(cx + hx * 1500, cy + hy * 1500, H / 2 + hz * 1500));
+  const sc = sun.shadow.camera, r = span * .62 * S;
+  sc.left = sc.bottom = -r; sc.right = sc.top = r; sc.near = 5; sc.far = 25; sc.updateProjectionMatrix();
+  wins.forEach(h => {
+    const w = R.walls.find(w => w.id === h.wall);
+    if (!w) return;
+    const c = h.position + h.width / 2, zc = h.sill + h.height / 2;
+    const gw = Math.max(10, h.width - 2 * PVC.frame), gh = Math.max(10, h.height - 2 * PVC.frame);   // the glass
+    const area = gw * gh / 1e4;                                                                      // m2
+    const at = (u, t, z) => P(w.a[0] + w.dx * u + w.nx * t, w.a[1] + w.dy * u + w.ny * t, z);       // t + = outwards
+    const skyO = skies.find(o => o.window === h.id) || skies.find(o => !o.window);
+    if (skyO) {
+      const sky = new THREE.RectAreaLight(0xffffff, 1, gw * S, gh * S);
+      sky.position.copy(at(c, -1, zc)); sky.lookAt(at(c, -100, zc));
+      sky.userData = { role: 'sky', sky: skyO.id, area }; root.add(sky); daylight.push(sky);
+    }
+    const facing = hx * w.nx + hy * w.ny;                                // cosine of the rays to the glass; > 0: the sun is outside this wall
+    if (!sunO || facing < .05 || hz < .02) return;
+    const base = [w.a[0] + w.dx * c, w.a[1] + w.dy * c], k = zc / hz;    // the glass centre, followed down to the floor
+    const px = clamp(base[0] - hx * k, minX + 20, maxX - 20), py = clamp(base[1] - hy * k, minY + 20, maxY - 20);
+    const across = Math.min(gh * facing / hz, span);                     // the glass height laid on the floor
+    const bounce = new THREE.RectAreaLight(0xffffff, 1, gw * S, across * S);
+    bounce.position.copy(P(px, py, 1));
+    bounce.rotation.y = Math.atan2(w.dy, w.dx); bounce.rotateX(Math.PI / 2);   // width along the wall, facing up
+    bounce.userData = { role: 'bounce', hz, proj: area * facing };       // proj: the glass area the beam fills
+    root.add(bounce); daylight.push(bounce);
+  });
+}
+
+// callbacks of the photoreal render mode (render_mode.js): around every applyMode, i.e. every light change and every build()
+function viewerHooks() { return viewerHooks.v ||= { beforeLight: [], afterLight: [] }; }   // a function: build() runs before this line
+// room surface for the indirect light: floor + ceiling + walls (m2)
+function roomArea() { return (Math.abs(signed) + R.walls.reduce((a, w) => a + w.L, 0) * H) / 1e4; }   // hoisted: build() runs before this line
+function applyMode() {
+  viewerHooks().beforeLight.forEach(f => f());                           // the render mode puts the scene back first (render_mode.js)
+  const m = MODES[lightMode], wb = m.wb;
+  // indirect light: every source's flux x the reflectance of what it lights first (the sun: the floor patch; downlights and
+  // strips: the floor and the worktop; the sky and the bulb: everything), scaled by the bounce object's mean reflectance
+  const bo = envOf('bounce'), rho = bo ? clamp((bo.reflectance ?? 50) / 100, 0, .9) : 0;
+  let flux = 0, bounced = 0;
+  const tint = new THREE.Color(0, 0, 0), add = (lm, col, first = .5) => {
+    flux += lm; bounced += lm * Math.min(.9, first * rho / .5); tint.add(col.clone().multiplyScalar(lm));
+  };
+  // the sun: its beam through the glass; it enters as E x glass area x cos (bounce lights carry that area)
+  const sunO = m.sun ? envOf('sun') : null, E = sunO ? sunO.illuminance ?? 80000 : 0, sunCol = lightColor(sunO?.kelvin ?? 5300, wb);
+  sun.visible = E > 0; sun.castShadow = sunO?.shadow !== false; sun.intensity = E * GLASS * LUX; sun.color.copy(sunCol);
+  // Hiding the kitchen removes the emitters at its window and floor, but keeps their contribution to the scene's daylight fill.
+  const showWindowLights = !hid.has(shellId(MAIN));
+  daylight.forEach(l => {
+    const u = l.userData;
+    if (u.role === 'sky') {                                            // a lambertian window of luminance L: flux = pi L A
+      const o = byId(u.sky), clear = m.sky === 'clear';
+      const L = m.sky ? (clear ? o.luminance ?? 5000 : o.overcast ?? 2500) : 0, col = lightColor((clear ? o.kelvin : o.kelvin_overcast) ?? 6500, wb);
+      l.visible = showWindowLights && L > 0; l.intensity = L * GLASS * LUX; l.color.copy(col);
+      if (L > 0) add(Math.PI * L * GLASS * u.area, col);
+      return;
+    }
+    // the sunlit patch: illuminance E x glass x sin(altitude), luminance = that x floor albedo / pi
+    l.visible = showWindowLights && E > 0; l.intensity = E * GLASS * u.hz * FLOOR_ALBEDO / Math.PI * LUX;
+    l.color.copy(sunCol).multiply(FLOOR_TINT);
+    if (E > 0) add(E * GLASS * u.proj, sunCol, FLOOR_ALBEDO + .05);
+  });
+  lamps.forEach(s => {
+    const col = lightColor(s.userData.kelvin, wb);
+    s.visible = m.lamps; s.color.copy(col);
+    s.userData.lens.emissive.copy(col); s.userData.lens.emissiveIntensity = m.lamps ? s.userData.glow || 3 : 0;
+    if (m.lamps) add(s.userData.flux, col, s.isPointLight ? .5 : .35);
+  });
+  // all the bounces (integrating sphere): E = bounced flux / (room surface x (1 - rho)); its colour = the sources' weighted by flux
+  const Eind = rho > 0 ? bounced / (roomArea() * (1 - rho)) : 0;
+  if (flux > 0) tint.multiplyScalar(1 / Math.max(tint.r, tint.g, tint.b)); else tint.set(1, 1, 1);
+  hemi.intensity = Eind * LUX * .65;
+  hemi.color.copy(tint);                                               // from above: the ceiling and the walls
+  hemi.groundColor.copy(tint).multiply(FLOOR_TINT).lerp(tint, .4);     // from below: the darker, warmer floor
+  scene.environmentIntensity = Eind * LUX * .035;                      // reflections (the map is a bright room: ~5x its intensity)
+  // the eye adapts to the room's general level (indirect light, at least a little), not fully
+  const exposure = clamp(Math.pow(E_REF / Math.max(Eind, 8), ADAPT), .05, 6);
+  renderer.toneMappingExposure = exposure;
+  scene.background.set(m.bg[dark ? 1 : 0]);
+  lightInfo = { flux, Eind, exposure };
+  document.querySelectorAll('[data-light]').forEach(b => setOn(b, b.dataset.light === lightMode));
+  shadowDirty = true;
+  viewerHooks().afterLight.forEach(f => f());                            // ... and re-captures it (every build() ends here too)
+}
+
+// Shadow maps are rendered only after a change (shadowMap.autoUpdate is off): into a 1 x 1 target, with the walls that the cutaway
+// hides put back for that moment - a cut-away wall still stands between the sun and the room.
+const shadowRT = new THREE.WebGLRenderTarget(1, 1);
+function updateShadows() {
+  shadowDirty = false;
+  const back = wallGroups.filter(g => !g.visible);
+  back.forEach(g => { g.visible = true; });
+  mirrorBusy = true;                                                   // no mirror reflections for this pass
+  renderer.shadowMap.needsUpdate = true;
+  const was = renderer.getRenderTarget();
+  renderer.setRenderTarget(shadowRT); renderer.render(scene, camera); renderer.setRenderTarget(was);
+  mirrorBusy = false;
+  back.forEach(g => { g.visible = false; });
+}
+
 // zones overlay
 const zoneGroup = new THREE.Group(); zoneGroup.visible = false; scene.add(zoneGroup);
 const zcol = [0x3d6e8c, 0xc0763a, 0x5a8f4e, 0x8c4f8c, 0xb5a23a];
@@ -1281,21 +1771,20 @@ composer.addPass(renderPass); composer.addPass(gtao); composer.addPass(new Outpu
 
 // ---------- camera modes ----------
 const target = P(cx, cy, 0);
-sun.position.copy(P(cx - span, cy - span * 0.6, 600)); sun.target.position.copy(target); scene.add(sun.target);
-const sc = sun.shadow.camera; sc.left = sc.bottom = -span * S; sc.right = sc.top = span * S; sc.far = 40;
 // Two independent things: the VIEW (where the camera stands) and the PROJECTION (perspective / orthographic).
-// The FOV is always 45 deg; there is no "fake orthographic" mode any more.
+// The perspective FOV is a scene setting (default FOV0 = 45 deg); there is no "fake orthographic" mode any more.
 controls.maxPolarAngle = Math.PI;                              // the camera may go below the floor: the floor is one-sided, so from underneath it is see-through
 // zoom limits: perspective = distance to the orbit target (m), orthographic = zoom factor
 // closest: ~1 cm across half the screen (perspective 2 cm from the target at FOV 45; orthographic x300)
 controls.minDistance = .02; controls.maxDistance = span * S * 10; controls.minZoom = .1; controls.maxZoom = 300;
 let quiet = false;                                             // true while the code, not the user, moves the camera
 const quietly = fn => { quiet = true; try { fn(); } finally { quiet = false; } };
-const markView = () => document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+const markView = () => document.querySelectorAll('[data-view]').forEach(b => setOn(b, b.dataset.view === view));
 function useCamera(c) {
   camera = c; isOrtho = c === ortho; controls.object = c; tc.camera = c;
   gtao.gtaoMaterial.defines.PERSPECTIVE_CAMERA = isOrtho ? 0 : 1; gtao.gtaoMaterial.needsUpdate = true;
-  btn('bpersp').classList.toggle('on', !isOrtho); btn('bortho').classList.toggle('on', isOrtho);
+  setOn(btn('bpersp'), !isOrtho); setOn(btn('bortho'), isOrtho);
+  btn('rfov').disabled = btn('rfovreset').disabled = isOrtho;     // the FOV only exists in perspective
 }
 // views: 'iso' (3D), 'top' (plan, north up), 'wall:<id>' (elevation: looking at that wall from inside), '' (moved by hand)
 function setView(v = view) {
@@ -1311,7 +1800,8 @@ function setView(v = view) {
   }
   camera.zoom = isOrtho ? span / fs : 1;                            // the ortho frustum is sized for this room
   // portrait screen (phone): step back so the width fits (the diagonal 3D view needs more room than the plan)
-  const k = isOrtho ? fs : fs * Math.max(1, (v === 'iso' ? 1.3 : .9) / persp.aspect);
+  const fovK = Math.tan(THREE.MathUtils.degToRad(FOV0 / 2)) / Math.tan(THREE.MathUtils.degToRad(persp.fov / 2));   // keeps the framing at any FOV
+  const k = isOrtho ? fs : fs * fovK * Math.max(1, (v === 'iso' ? 1.3 : .9) / persp.aspect);
   camera.position.copy(P(t[0] + d[0] * k, t[1] + d[1] * k, t[2] + d[2] * k));
   controls.target.copy(P(...t));
   camera.updateProjectionMatrix(); quietly(() => controls.update());
@@ -1336,10 +1826,6 @@ const camDir = new THREE.Vector3();
 function updateWalls() {
   const CUT = Math.cos(cutDeg * Math.PI / 180);
   camDir.subVectors(camera.position, controls.target).normalize();
-  // ceilings: cut away as soon as the camera is higher than the ceiling
-  const above = camera.position.y > R.ceiling * S;
-  ceiling.visible = !above && !hid.has(shellId(MAIN));
-  aptCeilings.forEach(m => { m.visible = !above; });
   wallGroups.forEach(g => {
     const { w, wid, labels } = g.userData;
     // a wall between the camera and the room disappears with its window/door and labels; outward normal in three coords: (nx, 0, -ny).
@@ -1358,52 +1844,51 @@ function updateWalls() {
 }
 
 R.walls.forEach(w => {
-  const b = el('button', '', w.id); b.dataset.view = 'wall:' + w.id;
+  const b = el('sl-button', '', w.id); b.size = 'small'; b.dataset.view = 'wall:' + w.id;
   btn('wallviews').append(b);
 });
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
 btn('bpersp').onclick = () => setProj(false);
 btn('bortho').onclick = () => setProj(true);
-btn('blabels').onclick = e => { const on = document.body.classList.toggle('hide-labels'); e.target.classList.toggle('on', !on); saveUi(); };
-btn('bao').onclick = e => { ao = !ao; e.target.classList.toggle('on', ao); saveUi(); };
+btn('blabels').addEventListener('sl-change', e => { document.body.classList.toggle('hide-labels', !e.target.checked); saveUi(); });
+btn('bao').addEventListener('sl-change', e => { ao = e.target.checked; saveUi(); });
+document.querySelectorAll('[data-light]').forEach(b => b.onclick = () => { lightMode = b.dataset.light; applyMode(); saveUi(); });
 btn('rcut').value = cutDeg; btn('vcut').textContent = cutDeg + '°';
-btn('rcut').oninput = e => { cutDeg = +e.target.value; btn('vcut').textContent = cutDeg + '°'; saveUi(); };   // updateWalls runs every frame
-btn('bzones').onclick = e => { zoneGroup.visible = !zoneGroup.visible; e.target.classList.toggle('on', zoneGroup.visible); saveUi(); };
+btn('rcut').addEventListener('sl-input', e => { cutDeg = +e.target.value; btn('vcut').textContent = cutDeg + '°'; saveUi(); });   // updateWalls runs every frame
+// field of view: slider in degrees, with the 35 mm-equivalent focal length next to it (frame 36 x 24 mm: f = 12 / tan(fov / 2))
+const showFov = () => { btn('vfov').textContent = `${Math.round(persp.fov)}° · ${Math.round(12 / Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)))} мм`; };
+const setFov = f => { persp.fov = clamp(f, 15, 110); persp.updateProjectionMatrix(); btn('rfov').value = persp.fov; showFov(); saveUi(); };
+btn('rfov').value = persp.fov; showFov(); btn('rfov').disabled = btn('rfovreset').disabled = isOrtho;
+btn('rfov').addEventListener('sl-input', e => setFov(+e.target.value));
+btn('rfovreset').onclick = () => setFov(FOV0);
+btn('bzones').addEventListener('sl-change', e => { zoneGroup.visible = e.target.checked; saveUi(); });
 // the whole flat at once: hides everything if anything of it is shown, otherwise shows all of it and frames it
 btn('bapt').hidden = !R.apartment.length;
-btn('bapt').onclick = () => {
-  const show = aptIds.every(id => hid.has(id));
-  setHidden(aptIds, !show);
+btn('bapt').addEventListener('sl-change', e => {
+  setHidden(aptIds, !e.target.checked);
   if (view === 'top' || view === 'iso') setView(view);
-};
+});
 
-// ---------- outliner + inspector (right panel) ----------
-const EYE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-const EYE_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18 18 0 0 1 5.1-5.9M9.9 4.2A10.7 10.7 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.2 3.2M1 1l22 22"/></svg>';
+// ---------- outliner + inspector (right panel): Shoelace sl-tree / sl-split-panel / sl-range / sl-input ----------
 const swatch = it => {
   const p = it.room && !it.kind ? palOf(it) : {};
-  return (it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? it.color || p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
+  return (it.type === 'sun' ? '#ffc94d' : it.type === 'sky' ? '#9fd0ef' : it.type === 'bounce' ? '#e8dccb' : LIGHT_TYPES.includes(it.type) ? '#ffd98a' : it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? it.color || p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
     || it.color || models[it.model]?.base || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
 };
 let inputs = {}, cinputs = {};
 
-function eye(off, fn) {
-  const b = el('button', 'eye'); b.innerHTML = off ? EYE_OFF : EYE; b.title = off ? 'Показать' : 'Скрыть'; b.onclick = fn;
-  return b;
-}
-// cutaway toggle of a wall: scissors = cut away while seen from outside, plain wall = always visible from both sides
-const SCISSORS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>';
-const SOLID = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 12h18M9 5v7M15 12v7"/></svg>';
-function cutBtn(cut, fn) {
-  const b = el('button', 'eye'); b.innerHTML = cut ? SCISSORS : SOLID; b.onclick = fn;
+const setEye = (b, off) => { b.name = off ? 'eye-slash' : 'eye'; b.title = off ? 'Показать' : 'Скрыть'; };
+// cutaway toggle of a wall: scissors = cut away while seen from outside, bricks = always visible from both sides
+const setCut = (b, cut) => {
+  b.name = cut ? 'scissors' : 'bricks';
   b.title = cut ? 'Срез: скрывается, когда камера снаружи. Нажмите — видна всегда' : 'Видна всегда, с обеих сторон. Нажмите — срез';
-  return b;
-}
+};
 function setSolid(ids, on) { record(); ids.forEach(id => on ? solid.add(id) : solid.delete(id)); renderTree(); renderEditor(); saveUi(); }
 function setHidden(ids, hide) { record(); ids.forEach(id => hide ? hid.add(id) : hid.delete(id)); build(); renderTree(); syncGizmo(); saveUi(); }
+// selecting only draws the outline (applySelection) and marks the row: no rebuild of the scene
 function select(id) {
   if (id !== sel) gizmoMode = 0;                    // the gizmo belongs to one selected item
-  sel = id; build(); renderTree(); renderEditor(); syncGizmo(); saveUi();   // renderEditor() returns early with no item, so sync here too
+  sel = id; applySelection(); renderTree(); renderEditor(); syncGizmo(); saveUi();   // renderEditor() returns early with no item, so sync here too
   if (phone.matches) sheet('side', !!id);          // phone: a tap on an object opens its editor, a tap on empty space closes the sheet
 }
 
@@ -1414,25 +1899,18 @@ function sheet(name, open) {                       // open: true / false, or und
   const next = open === undefined ? (cur === name ? null : name) : open ? name : null;
   document.body.classList.remove('sheet-panel', 'sheet-side');
   if (next) document.body.classList.add('sheet-' + next);
-  document.querySelectorAll('#mbar button').forEach(b => b.classList.toggle('on', b.dataset.sheet === next));
+  document.querySelectorAll('#mbar sl-button').forEach(b => setOn(b, b.dataset.sheet === next));
 }
-document.querySelectorAll('#mbar button').forEach(b => b.onclick = () => sheet(b.dataset.sheet));
+document.querySelectorAll('#mbar sl-button').forEach(b => b.onclick = () => sheet(b.dataset.sheet));
 
-// ---------- desktop: tree height (drag the bar) and hidden panels, remembered per browser ----------
+// ---------- desktop: split position and hidden panels, remembered per browser ----------
 const LKEY = 'planner:layout';
 let lay = {};
 try { lay = JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch { /* defaults */ }
 const saveLay = () => { try { localStorage.setItem(LKEY, JSON.stringify(lay)); } catch { /* not persisted */ } };
-const treeEl = document.getElementById('tree');
-const setTreeH = h => { treeEl.style.maxHeight = clamp(h, 60, innerHeight - 220) + 'px'; };   // 220: room left for the inspector and footer
-if (lay.treeH) setTreeH(lay.treeH);
-const split = document.getElementById('split');
-split.onpointerdown = e => {
-  const y0 = e.clientY, h0 = treeEl.getBoundingClientRect().height;
-  split.setPointerCapture(e.pointerId); split.classList.add('drag');
-  split.onpointermove = m => setTreeH(h0 + m.clientY - y0);
-  split.onpointerup = () => { split.classList.remove('drag'); split.onpointermove = split.onpointerup = null; lay.treeH = parseFloat(treeEl.style.maxHeight); saveLay(); };
-};
+const split = btn('split');
+if (lay.split > 5 && lay.split < 95) split.position = lay.split;
+split.addEventListener('sl-reposition', () => { lay.split = Math.round(split.position * 10) / 10; saveLay(); });
 ['panel', 'side'].forEach(n => document.body.classList.toggle('hide-' + n, !!lay['hide_' + n]));
 document.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
   lay['hide_' + b.dataset.hide] = document.body.classList.toggle('hide-' + b.dataset.hide); saveLay();
@@ -1441,94 +1919,142 @@ document.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => {
 // Every room is the same tree node: its eye hides the whole room (floor, walls, objects); inside it the same folders -
 // «Стены» (floor + walls: scissors = cutaway, eye = floor and walls only), «Проёмы» (windows / doors cut in its walls),
 // then its objects, in the folders named by `group` (no group: «Объекты»).
-const treeKeys = [];                                           // every collapsible node of the tree, filled by renderTree
-btn('bcollapse').onclick = () => { treeKeys.forEach(k => collapsed.add(k)); renderTree(); saveUi(); };
-function renderTree() {
-  const tree = btn('tree'); tree.replaceChildren();
-  btn('bapt').classList.toggle('on', !aptIds.every(id => hid.has(id)));
-  treeKeys.length = 0;
-  const node = (key, title, count) => {                       // a collapsible tree node, remembered in `collapsed`
-    treeKeys.push(key);
-    const d = el('details'); d.open = !collapsed.has(key);
-    d.ontoggle = () => { d.open ? collapsed.delete(key) : collapsed.add(key); saveUi(); };
-    const s = el('summary'); s.append(el('span', '', title), el('span', 'cnt', String(count)));
-    d.append(s);
-    return [d, s];
+// The tree is built ONCE (buildTree); every later change (selection, an eye, a colour) only updates the rows in place (updateTree).
+const treeEl = btn('tree');
+const rowOf = new Map();                                       // item id -> { t: sl-tree-item, sw, eye, cut, it, room }
+const nodeOf = new Map();                                      // collapsible node key -> sl-tree-item
+const live = [];                                               // refreshers of the buttons on the folders / rooms
+let treeBuilt = false;
+const tbtn = fn => { const b = el('sl-icon-button', 'tb'); b.onclick = e => { e.stopPropagation(); fn(); }; return b; };   // eye / scissors inside a row
+function buildTree() {
+  treeBuilt = true;
+  const node = (key, title, count, parent) => {                // a collapsible node, its state remembered in `collapsed`
+    const t = el('sl-tree-item'); t.dataset.key = key; t.expanded = !collapsed.has(key); nodeOf.set(key, t);
+    t.append(el('span', 'nm', title), el('span', 'cnt', String(count)));
+    parent.append(t);
+    return t;
   };
-  const stop = fn => e => { e.preventDefault(); e.stopPropagation(); fn(); };
+  const row = (it, fixed, parent, room) => {
+    const t = el('sl-tree-item'), sw = el('i', 'sw'), r = { t, sw, it, room };
+    t.dataset.id = it.id; t.append(sw, el('span', 'nm', it.label));
+    if (wallRow(it.id)) { r.cut = tbtn(() => setSolid([it.id], !solid.has(it.id))); t.append(r.cut); }
+    else if (!fixed) { r.eye = tbtn(() => setHidden([it.id], !hid.has(it.id))); t.append(r.eye); }
+    parent.append(t); rowOf.set(it.id, r);
+  };
+  if (sceneLights.length) {
+    const lighting = node(sceneLightKey, 'Освещение сцены', sceneLights.length, treeEl);
+    sceneLights.forEach(o => row(o, false, lighting));
+  }
   ROOMS.forEach(room => {
+    const objects = room.objects.filter(o => !sceneLights.includes(o));
+    const sid = shellId(room), roomIds = [sid, ...objects.map(o => o.id)];
+    const rn = node(room.id, room.name, objects.filter(o => !isGroup(o)).length, treeEl);
+    { const allOff = () => roomIds.every(id => hid.has(id)), b = tbtn(() => setHidden(roomIds, !allOff())); live.push(() => setEye(b, allOff())); rn.append(b); }
     const folders = new Map([['Стены', { list: WALLS.filter(x => x.wallOf === room), shell: true }]]);
     if (room.main && R.holes.length) folders.set('Проёмы', { list: R.holes, fixed: true });
-    const roomIds = [shellId(room), ...room.objects.map(o => o.id)], shellOff = hid.has(shellId(room));
-    const [rd, rs] = node(room.id, room.name, room.objects.filter(o => !isGroup(o)).length);
-    const allOff = roomIds.every(id => hid.has(id));
-    rs.append(eye(allOff, stop(() => setHidden(roomIds, !allOff))));
-    const row = (it, fixed) => {
-      const isWall = !!wallRow(it.id), off = hid.has(it.id) || (it.wallOf && hid.has(shellId(it.wallOf))) || (it.kind && shellOff);
-      const r = el('div', 'item' + (it.id === sel ? ' sel' : '') + (off ? ' off' : ''));
-      const sw = el('i', 'sw'); sw.style.background = swatch(it);
-      r.append(sw, el('span', 'nm', it.label));
-      if (isWall) r.append(cutBtn(!solid.has(it.id), e => { e.stopPropagation(); setSolid([it.id], !solid.has(it.id)); }));
-      else if (!fixed) r.append(eye(hid.has(it.id), e => { e.stopPropagation(); setHidden([it.id], !hid.has(it.id)); }));
-      r.onclick = () => select(it.id);
-      return r;
-    };
     folders.forEach((f, name) => {
-      const wids = f.list.filter(o => wallRow(o.id)).map(o => o.id);
-      const [d, s] = node(room.id + '/' + name, name, f.list.length);
+      const wids = f.list.filter(o => wallRow(o.id)).map(o => o.id), d = node(room.id + '/' + name, name, f.list.length, rn);
       if (wids.length) {                                      // one click: cutaway on / off for every wall of the room
-        const allCut = wids.every(id => !solid.has(id));
-        s.append(cutBtn(allCut, stop(() => setSolid(wids, allCut))));
+        const allCut = () => wids.every(id => !solid.has(id)), b = tbtn(() => setSolid(wids, allCut()));
+        live.push(() => setCut(b, allCut())); d.append(b);
       }
       if (f.shell) {                                          // floor + walls only, the objects stay
-        const b = eye(shellOff, stop(() => setHidden([shellId(room)], !shellOff)));
-        if (wids.length) b.style.marginLeft = '0';            // both icons together at the right edge
-        s.append(b);
+        const b = tbtn(() => setHidden([sid], !hid.has(sid))); live.push(() => setEye(b, hid.has(sid))); d.append(b);
       }
-      f.list.forEach(it => d.append(row(it, f.fixed)));
-      rd.append(d);
+      f.list.forEach(it => row(it, f.fixed, d, room));
     });
     // objects: a container (type: group / kitchen) is a tree node with its children inside, an object without a parent
     // stands directly in the room; a click on a container's name selects it and folds / unfolds it
-    const kids = pid => room.objects.filter(o => (o.parent || null) === pid);
+    const kids = pid => objects.filter(o => (o.parent || null) === pid);
     const leaves = o => isGroup(o) ? kids(o.id).flatMap(leaves) : [o];
-    const addObj = (into, o) => {
-      if (!isGroup(o)) return into.append(row(o));
-      const ids = leaves(o).map(x => x.id), key = room.id + '/' + o.id, [d, s] = node(key, o.label, ids.length);
-      s.classList.toggle('sel', o.id === sel);
-      s.addEventListener('click', e => {
-        if (e.target.closest('.eye')) return;
-        e.preventDefault(); collapsed.has(key) ? collapsed.delete(key) : collapsed.add(key); select(o.id);
-      });
-      const off = ids.length > 0 && ids.every(id => hid.has(id));
-      s.append(eye(off, stop(() => setHidden(ids, !off))));
-      kids(o.id).forEach(c => addObj(d, c));
-      into.append(d);
+    const addObj = (parent, o) => {
+      if (!isGroup(o)) return row(o, false, parent, room);
+      const ids = leaves(o).map(x => x.id), g = node(room.id + '/' + o.id, o.label, ids.length, parent);
+      g.dataset.id = o.id; rowOf.set(o.id, { t: g, it: o, room });
+      const off = () => ids.length > 0 && ids.every(id => hid.has(id)), b = tbtn(() => setHidden(ids, !off()));
+      live.push(() => setEye(b, off())); g.append(b);
+      kids(o.id).forEach(c => addObj(g, c));
     };
-    kids(null).forEach(o => addObj(rd, o));
-    tree.append(rd);
+    kids(null).forEach(o => addObj(rn, o));
   });
 }
+function updateTree() {
+  rowOf.forEach(r => {
+    const it = r.it, off = hid.has(it.id) || (it.wallOf && hid.has(shellId(it.wallOf))) || (it.kind && hid.has(shellId(r.room)));
+    r.t.selected = it.id === sel; r.t.classList.toggle('off', !!off);
+    if (r.sw) r.sw.style.background = swatch(it);
+    if (r.eye) setEye(r.eye, hid.has(it.id));
+    if (r.cut) setCut(r.cut, !solid.has(it.id));
+  });
+  nodeOf.forEach(n => { if (!n.dataset.id) n.selected = false; });
+  live.forEach(f => f());
+  setOn(btn('bapt'), !aptIds.every(id => hid.has(id)));
+}
+function renderTree() { if (!treeBuilt) buildTree(); updateTree(); }
+
+// a click on a row selects it; on a folder / room / container it folds or unfolds it (the chevron does that on its own)
+treeEl.addEventListener('click', e => {
+  const t = e.target.closest?.('sl-tree-item');
+  if (!t || e.composedPath().some(n => n.classList?.contains('tree-item__expand-button'))) return;
+  if (t.dataset.key) t.expanded = !t.expanded;
+  if (t.dataset.id) select(t.dataset.id); else updateTree();   // a folder is never "selected": put the mark back on the item
+});
+treeEl.addEventListener('sl-expand', e => { const k = e.target.dataset?.key; if (k) { collapsed.delete(k); saveUi(); } });
+treeEl.addEventListener('sl-collapse', e => { const k = e.target.dataset?.key; if (k) { collapsed.add(k); saveUi(); } });
+btn('bcollapse').onclick = () => nodeOf.forEach(n => { n.expanded = false; });
 
 // width = along the wall the object stands against, depth = away from that wall, height = up: the same for every object
-const LABELS = { height: 'Высота', depth: 'Глубина', top: 'Столешница', elevation: 'Высота от пола', gap: 'Отступ от стены' };
+const LABELS = { height: 'Высота', depth: 'Глубина', top: 'Столешница', elevation: 'Высота от пола', gap: 'От стены, вглубь комнаты', width: 'Ширина',
+  lumens: 'Световой поток', lumens_m: 'Световой поток на метр', illuminance: 'Освещённость', altitude: 'Высота над горизонтом', azimuth: 'Сбоку от окна',
+  luminance: 'Яркость неба', overcast: 'Яркость неба в пасмурный день', kelvin_overcast: 'Цветовая температура в пасмурный день', reflectance: 'Отражение поверхностей', kelvin: 'Цветовая температура', beam: 'Угол луча' };
+const UNITS = { rails: 'шт', doors: 'шт', shelves: 'шт', rotation: '°', beam: '°', lumens: 'лм', lumens_m: 'лм/м', kelvin: 'K', illuminance: 'лк', altitude: '°', azimuth: '°', luminance: 'кд/м²', overcast: 'кд/м²', kelvin_overcast: 'K', reflectance: '%' }, STEPS = { rails: 1, doors: 1, shelves: 1, board: .1, rotation: 5, beam: 5, lumens: 10, lumens_m: 10, kelvin: 100, illuminance: 1000, altitude: 1, azimuth: 1, luminance: 100, overcast: 100, kelvin_overcast: 100, reflectance: 1 };
 const sections = it => it.kind ? [
   ['Положение', [['position', `От угла ${it.wall.split('-')[0]}`]]],
   ['Размер', [['width', 'Ширина'], ['height', 'Высота'], ...(it.kind === 'window' ? [['sill', 'Подоконник от пола']] : [])]],
   ...(it.kind === 'window' && it.mullion != null ? [['Импост', [['mullion', `От края окна у угла ${it.wall.split('-')[0]}`]]]] : []),
 ] : isGroup(it) ? [
   ['Задано для вложенных объектов', Object.keys(it.def).filter(k => !PAL.some(([c]) => c === k)).map(k => [k, LABELS[k] || it.params[k]?.label || k])],
+] : it.type === 'sun' ? [
+  ['Солнце (режим «Солнце»)', [['illuminance', 'Освещённость прямыми лучами'], ['kelvin', 'Цветовая температура'],
+    ['altitude', 'Высота над горизонтом'], ['azimuth', 'Сбоку от окна (− / + к углам стены)']]],
+] : it.type === 'sky' ? [
+  ['Ясный день (режим «Солнце»)', [['luminance', 'Яркость неба в окне'], ['kelvin', 'Цветовая температура']]],
+  ['Пасмурно', [['overcast', 'Яркость неба в окне'], ['kelvin_overcast', 'Цветовая температура']]],
+] : it.type === 'bounce' ? [
+  ['Переотражённый свет', [['reflectance', 'Среднее отражение стен, пола, потолка']]],
+] : it.type === 'bulb' ? [
+  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'От стены, вглубь комнаты'], ['elevation', 'Низ лампочки от пола']]],
+  ['Размер', [['width', 'Диаметр колбы'], ['height', 'Высота лампочки']]],
+  ['Свет (горит в режиме «Вечер»)', [['lumens', 'Световой поток'], ['kelvin', 'Цветовая температура']]],
+] : it.type === 'strip' ? [
+  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'От стены, вглубь комнаты'], ['elevation', 'Низ профиля от пола']]],
+  ['Размер', [['width', 'Длина'], ['depth', 'Ширина профиля'], ['height', 'Высота профиля']]],
+  ['Свет (горит в режиме «Вечер»)', [['lumens_m', 'Световой поток на метр'], ['kelvin', 'Цветовая температура']]],
+] : it.type === 'light' ? [
+  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'От стены, вглубь комнаты'], ['elevation', 'Низ светильника от пола']]],
+  ['Размер', [['width', 'Диаметр'], ['height', 'Высота рамки']]],
+  ['Свет (горит в режиме «Вечер»)', [['lumens', 'Световой поток'], ['kelvin', 'Цветовая температура'], ['beam', 'Угол луча']]],
 ] : [
-  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'Отступ от стены'], ['elevation', 'Высота от пола'], ['rotation', 'Поворот (по часовой, сверху)']]],
+  ['Положение', [['position', `Вдоль стены, от угла ${it.wall.split('-')[0]}`], ['gap', 'От стены, вглубь комнаты'], ['elevation', 'Высота от пола'], ['rotation', 'Поворот (по часовой, сверху)']]],
   ['Размер', it.type === 'slats' ? [['width', 'Длина перегородки'], ['depth', 'Толщина рейки'], ['height', 'Высота']]
     : [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
   ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
   ...(it.doors != null ? [['Фасады', [['doors', 'Дверец']]]] : []),
   ...(it.type === 'tv' ? [['Телевизор', [['panel', 'Толщина панели'], ['stand', 'Высота подставки под панелью']]]] : []),
   ...(it.type === 'slats' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки']]]] : []),
+  ...(it.type === 'shelf' ? [['Полки', [['shelves', 'Количество полок'], ['board', 'Толщина щита'], ['plinth', 'Цоколь']]],
+    ['Подсветка полок (горит в режиме «Вечер»)', [['lumens_m', 'Световой поток на метр (0 — нет)'], ['kelvin', 'Цветовая температура']]]] : []),
   ...(it.type === 'portal' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки (в глубину)'], ['rail_thickness', 'Толщина рейки']]]] : []),
 ];
 
+const ENV_HINT = {
+  sun: 'Прямые солнечные лучи через окно: летом в полдень ~100 000 лк, при низком солнце или в дымке 30 000–70 000. '
+    + 'Высота и направление задаются от окна (стороны света комнаты пока неизвестны). 5300 K — дневное солнце, 3500–4500 K — утро / вечер.',
+  sky: 'Небо и освещённая улица, видимые через окно. Ясный день: 3000–8000 кд/м², пасмурно: 1000–4000 (тёмный день — меньше). '
+    + 'Стекло пропускает ~70 %. Голубое небо — 7000–10 000 K, облака — 6000–7000 K.',
+  bounce: 'Свет, отражённый стенами, полом и потолком (не прямой). Считается из всего светового потока, попавшего в комнату: '
+    + 'солнечное пятно на полу заливает светом всю комнату. Светлые стены и потолок — 60–70 %, тёмный пол и мебель снижают до 40–50 %.',
+};
 function renderEditor() {
   const wr = wallRow(sel), it = wr || byId(sel);
   btn('editor').hidden = !it; btn('empty').hidden = !!it;
@@ -1536,33 +2062,39 @@ function renderEditor() {
   if (wr) {                                                   // a wall: only its cutaway setting
     btn('esw').style.background = wr.color; btn('etitle').textContent = wr.label;
     btn('esub').textContent = wr.wallOf.name + (wr.w ? ` · ${Math.round(wr.w.length || wr.w.L)} см` : '');
-    btn('eundo').hidden = true; inputs = {};
-    const cb = el('input'); cb.type = 'checkbox'; cb.checked = !solid.has(wr.id);
-    cb.onchange = () => setSolid([wr.id], !cb.checked);
-    const l = el('label', 'chk'); l.append(cb, el('span', '', 'Срез — скрывать, когда камера снаружи'));
-    btn('fields').replaceChildren(l);
+    btn('eundo').hidden = true; inputs = {}; cinputs = {};
+    const cb = el('sl-switch', '', 'Срез — скрывать, когда камера снаружи'); cb.size = 'small'; cb.checked = !solid.has(wr.id);
+    cb.addEventListener('sl-change', () => setSolid([wr.id], !cb.checked));
+    btn('fields').replaceChildren(cb);
     btn('ehint').textContent = 'Срез включён: стена исчезает, когда камера смотрит на неё снаружи, чтобы не мешала видеть комнату.\n'
       + 'Выключен: стена видна всегда, с обеих сторон.';
     return;
   }
   btn('esw').style.background = swatch(it);
   btn('etitle').textContent = it.label;
-  btn('esub').textContent = `${roomById(it.room).name} · ${it.wall ? 'стена ' + it.wall : 'группа'}`;
+  btn('esub').textContent = sceneLights.includes(it) ? 'Освещение сцены'
+    : `${roomById(it.room).name} · ${it.wall ? 'стена ' + it.wall : ENV.includes(it.type) ? 'источник света' : 'группа'}`;
   inputs = {}; cinputs = {}; btn('fields').replaceChildren();
+  const picker = (value, title, onInput) => {                         // a colour: Shoelace sl-color-picker, live while dragging
+    const p = el('sl-color-picker'); p.size = 'small'; p.format = 'hex'; p.noFormatToggle = true; p.hoist = true; p.title = title; p.value = value;
+    p.addEventListener('sl-input', () => { if (p.value) onInput(p.value); });
+    return p;
+  };
   sections(it).filter(([, rows]) => rows.length).forEach(([title, rows]) => {
     btn('fields').append(el('div', 'stitle', title));
     rows.forEach(([k, label]) => {
       const link = it.link[k], was = origById[it.id].link[k];     // link: the value is derived (formula / parent); was: it was in the YAML
-      const num = el('input'); num.type = 'number'; num.step = 1;
-      const rng = el('input'); rng.type = 'range'; rng.step = k === 'rails' || k === 'doors' ? 1 : k === 'rotation' ? 5 : .5;   // slider and number box edit the same value
-      num.oninput = rng.oninput = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setField(it, k, v); };
-      num.onchange = () => { num.value = r1(it[k]); };                // show the clamped value
+      const num = el('sl-input'); num.type = 'number'; num.size = 'small'; num.step = 'any'; num.noSpinButtons = true;
+      const unit = el('span', '', UNITS[k] || 'см'); unit.slot = 'suffix'; num.append(unit);
+      const rng = el('sl-range'); rng.step = STEPS[k] || .5; rng.tooltip = 'none';   // slider and number box edit the same value
+      const edit = e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setField(it, k, v); };
+      num.addEventListener('sl-input', edit); rng.addEventListener('sl-input', edit);
+      num.addEventListener('sl-change', () => { num.value = r1(it[k]); });   // show the clamped value
       inputs[k] = { num, rng };
       num.disabled = rng.disabled = !!link;                           // derived: edit its source, or unlock it
-      const box = el('span', 'ibox'); box.append(num, el('span', 'unit', k === 'rails' || k === 'doors' ? 'шт' : k === 'rotation' ? '°' : 'см'));
       const top = el('div', 'top'); top.append(el('span', '', label));
-      if (link || was) {                                              // 🔗 linked -> set by hand;  🔓 set by hand -> back to the link
-        const b = el('button', 'eye', link ? '🔗' : '🔓');
+      if (link || was) {                                              // linked -> set by hand;  unlocked -> back to the link
+        const b = el('sl-icon-button', 'lock'); b.name = link ? 'link-45deg' : 'unlock';
         b.title = link ? [link.expr && 'Формула ' + link.expr, link.from && `унаследовано от «${byId(link.from).label}»`].filter(Boolean).join(', ') + '. Нажмите — задать вручную'
                        : 'Задано вручную. Нажмите — вернуть привязку';
         b.onclick = () => {
@@ -1572,26 +2104,52 @@ function renderEditor() {
         };
         top.append(b);
       }
-      top.append(box);
+      top.append(num);
       const f = el('div', 'f'); f.append(top, rng);
       btn('fields').append(f);
     });
   });
+  const toggle = (k, label) => {                                      // an on / off field (true unless `false`)
+    const sw = el('sl-switch', '', label); sw.size = 'small'; sw.checked = it[k] !== false;
+    sw.addEventListener('sl-change', () => { record(it.id + '.' + k); it.def[k] = sw.checked; resolveAll(); saveEdits(); build(); refresh(); });
+    btn('fields').append(sw);
+  };
+  if (it.type === 'shelf') toggle('led', 'Подсветка полок включена');   // keeps its lumens and kelvin
+  if (castsShadow(it)) toggle('shadow', isGroup(it) ? 'Тени от всех ламп группы' : 'Отбрасывает тени');
   if (hasColor(it)) {                                                 // the one main colour of a simple object
-    const inp = el('input'); inp.type = 'color'; inp.title = 'Основной цвет'; cinputs.color = inp;
-    inp.value = it.color || models[it.model]?.base || '#c9b8a6';
-    inp.oninput = () => { record(it.id + '.color'); it.def.color = it.color = inp.value; saveEdits(); build(); renderTree(); refresh(); };
-    const l = el('label', 'ocol'); l.append(inp, el('span', '', it.model ? 'Основной цвет (остальные части модели — в тон)' : 'Цвет'));
+    const inp = picker(it.color || models[it.model]?.base || '#c9b8a6', 'Основной цвет', v => {
+      record(it.id + '.color'); it.def.color = it.color = v; saveEdits(); build(); renderTree(); refresh();
+    });
+    cinputs.color = inp;
+    const l = el('div', 'ocol'); l.append(inp, el('span', '', it.model ? 'Основной цвет (остальные части модели — в тон)' : it.type === 'shelf' ? 'Корпус' : 'Цвет'));
     btn('fields').append(el('div', 'stitle', 'Цвет'), l);
+    if (it.type === 'shelf') {                                        // the second colour of a shelving unit: back panel and shelves
+      const ii = picker(it.inner, 'Полки и задняя стенка', v => { record(it.id + '.inner'); it.def.inner = it.inner = v; saveEdits(); build(); renderTree(); refresh(); });
+      cinputs.inner = ii;
+      const l2 = el('div', 'ocol'); l2.append(ii, el('span', '', 'Полки и задняя стенка'));
+      btn('fields').append(l2);
+    }
   }
   if (it.type === 'kitchen') {                                        // the palette of every `kitchen:` cabinet of the room
     const g = el('div', 'kcol');
     PAL.forEach(([k, label]) => {
-      const inp = el('input'); inp.type = 'color'; inp.title = label; inp.value = it[k]; cinputs[k] = inp;
-      inp.oninput = () => { record(it.id + '.' + k); it.def[k] = it[k] = inp.value; saveEdits(); build(); renderTree(); refresh(); };
+      const inp = picker(it[k], label, v => { record(it.id + '.' + k); it.def[k] = it[k] = v; saveEdits(); build(); renderTree(); refresh(); });
+      cinputs[k] = inp;
       const l = el('label'); l.append(inp, el('span', '', label)); g.append(l);
     });
     btn('fields').append(el('div', 'stitle', 'Цвета кухни'), g);
+  }
+  if (hasFinish(it)) {                                                // the material of the photoreal render (`finish:`)
+    const s = Object.assign(document.createElement('sl-select'), { size: 'small', hoist: true });
+    s.innerHTML = FINISHES.map(([v, t]) => `<sl-option value="${v}">${t}</sl-option>`).join('');
+    s.setAttribute('value', it.def.finish || 'auto');
+    s.title = 'Из чего сделан предмет — только для фотореалистичного рендера: ткань с мягким отливом, дерево с волокнами, пластик, лак, металл…';
+    s.addEventListener('sl-change', () => {
+      record(it.id + '.finish');
+      if (s.value === 'auto') { delete it.def.finish; it.finish = null; } else it.def.finish = it.finish = s.value;
+      saveEdits(); build(); refresh();
+    });
+    btn('fields').append(el('div', 'stitle', 'Материал (для рендера)'), s);
   }
   refresh();
 }
@@ -1607,12 +2165,14 @@ function refresh() {
       num.classList.toggle('mod', diff(k));
     });
     PAL.forEach(([k]) => { if (cinputs[k]) { cinputs[k].value = it[k]; cinputs[k].classList.toggle('mod', diff(k)); } });
+    if (cinputs.inner) { cinputs.inner.value = it.inner; cinputs.inner.classList.toggle('mod', diff('inner')); }
     if (cinputs.color) { cinputs.color.value = it.color || models[it.model]?.base || '#c9b8a6'; cinputs.color.classList.toggle('mod', diff('color')); }
     btn('eundo').hidden = !Object.keys({ ...inputs, ...cinputs }).some(diff);
     const w = edgeOf(it);
-    btn('ehint').textContent = (w ? `Стена ${it.wall}: ${r1(w.L)} см.\nДо угла ${it.wall.split('-')[1]}: ${r1(w.L - it.position - it.width)} см.` : '')
+    btn('ehint').textContent = (w ? `Координаты отсчитываются от стены ${it.wall} (${r1(w.L)} см).` : '')
       + (isGroup(it) ? 'Группа без своей формы. Что задано здесь, наследуют вложенные объекты, у которых это поле не задано.' : '')
-      + (it.kind || isGroup(it) ? '' : '\nШирина — вдоль стены, глубина — от стены в комнату.')
+      + (it.kind || isGroup(it) || !it.wall ? '' : '\nШирина — вдоль стены, глубина — от стены в комнату.')
+      + (ENV_HINT[it.type] || '')
       + (roomById(it.room).main ? '' : '\nРазмеры по плану застройщика (±10–15 см) — уточните рулеткой.')
       + (Object.keys(it.link).some(k => it.link[k]) ? '\n🔗 — значение выведено из формулы или родителя; замок переключает на ручное.' : '')
       + (it.err ? `\n⚠ ${it.err}` : '');
@@ -1745,12 +2305,10 @@ controls.mouseButtons.RIGHT = null;                            // ... and pan on
 // picked on the scene: open its tree group and scroll the tree so the row sits in the middle
 // (not on a click in the tree itself: the list must not jump under the pointer)
 function revealSel() {
-  const tree = btn('tree'), row = tree.querySelector('.item.sel');
+  const row = rowOf.get(sel);
   if (!row) return;
-  for (let d = row.closest('details'); d; d = d.parentElement.closest('details'))
-    if (!d.open) d.open = true;                                // the folder and its room; ontoggle forgets the collapsed state
-  const tr = tree.getBoundingClientRect(), rr = row.getBoundingClientRect();
-  tree.scrollTo({ top: tree.scrollTop + rr.top - tr.top - (tree.clientHeight - rr.height) / 2, behavior: 'smooth' });
+  for (let p = row.t.parentElement; p && p !== treeEl; p = p.parentElement) if (p.localName === 'sl-tree-item') p.expanded = true;   // the folder and its room
+  setTimeout(() => row.t.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
 }
 addEventListener('keydown', e => {
   if (e.key === 'Escape') return select(null);
@@ -1762,7 +2320,7 @@ addEventListener('keydown', e => {
 const FLY = { KeyW: [0, 0, 1], KeyS: [0, 0, -1], KeyA: [-1, 0, 0], KeyD: [1, 0, 0], KeyQ: [0, -1, 0], KeyE: [0, 1, 0] };
 const held = new Set();
 let speed = clamp(+ui.speed || 1, .05, 20), speedTimer;                         // m/s
-const typing = () => document.activeElement?.matches('input, textarea, select');
+const typing = () => document.activeElement?.matches('input, textarea, select, sl-input, sl-range, sl-color-picker');
 addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey || typing()) return;
   if (FLY[e.code]) { held.add(e.code); e.preventDefault(); return; }
@@ -1811,21 +2369,29 @@ if (location.hash !== '#top' && Array.isArray(ui.cam?.p) && Array.isArray(ui.cam
   camera.zoom = ui.cam.z || 1; camera.updateProjectionMatrix(); quietly(() => controls.update());
 }
 markView();
-btn('bao').classList.toggle('on', ao);
-document.body.classList.toggle('hide-labels', ui.labels === false); btn('blabels').classList.toggle('on', ui.labels !== false);
-zoneGroup.visible = !!ui.zones; btn('bzones').classList.toggle('on', zoneGroup.visible);
+setOn(btn('bao'), ao);
+document.body.classList.toggle('hide-labels', ui.labels === false); setOn(btn('blabels'), ui.labels !== false);
+zoneGroup.visible = !!ui.zones; setOn(btn('bzones'), zoneGroup.visible);
 // the user moved the camera by hand: it is no longer in any of the preset views
 controls.addEventListener('change', () => { if (!quiet && view) { view = ''; markView(); } saveUi(); });
-renderTree(); renderEditor(); refresh(); revealSel();
-renderer.setAnimationLoop(() => {
+renderTree(); renderEditor(); refresh();
+customElements.whenDefined('sl-tree-item').then(() => requestAnimationFrame(revealSel));   // after the tree rows are upgraded
+function tick() {
   fly(); controls.update(); updateWalls();
+  if (shadowDirty) updateShadows();
   // near plane follows the zoom: 1 mm in close-ups, 5 cm from afar (keeps depth precision, no flicker)
   const near = clamp(camera.position.distanceTo(controls.target) / 20, .001, .05);
   if (!isOrtho && Math.abs(persp.near - near) > 1e-5) { persp.near = near; persp.updateProjectionMatrix(); }
   if (ao) { renderPass.camera = gtao.camera = camera; composer.render(); } else renderer.render(scene, camera);
   if (tc.object) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(gizmoScene, camera); renderer.autoClear = true; }   // gizmo on top
   labelRenderer.render(scene, camera);
-});
+}
+renderer.setAnimationLoop(tick);
+window.__viewer = { get camera() { return camera; }, controls, scene, renderer, lamps, sun, OCC,   // for debugging / tests from the console
+  // ... and for the photoreal render mode (render_mode.js, inlined below by build_room_3d.py)
+  hooks: viewerHooks(), tick, wallGroups, daylight, hemi, MODES, envOf, R, H, S, LUX, GLASS, lightColor, ceilMat, labelRenderer,
+  updateWalls, get mode() { return lightMode; }, get info() { return lightInfo; }, apply: () => applyMode() };
 window.__ready = true;</script>
+<!--__RENDER_MODE__-->
 </body>
 </html>

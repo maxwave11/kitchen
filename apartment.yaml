@@ -273,6 +273,19 @@ rooms:
         depth: 30
         height: 90
         color: "#f2efe9"
+      - id: bathroom-ceiling-light
+        label: "Потолочный светильник ванной"
+        type: light
+        wall: A-B
+        position: 96
+        gap: 76
+        elevation: 265
+        width: 24
+        depth: 24
+        height: 5
+        lumens: 1200
+        kelvin: 4000
+        beam: 110
 
   - id: bedroom-10
     name: "Спальня 10,05"
@@ -325,5 +338,6 @@ notes: |
     estimated from photo 2). Door hinged on the box side (the left side would hit the towel rail), or a lift-up front.
     Not measured yet: the slot width at 140-230 cm and the towel rail's top and depth.
     Accepted by Maxim the same day: light matte front in the tile colour, chrome handle or push-to-open.
+  2026-11-14: added a ceiling light to preview the bathroom in the evening. Fixture placement and output are estimates.
   TODO: measure the wardrobe (width x depth x height, where it starts from the kitchen wall), the hall unit,
     the ventilation box, the entrance door and the corridor width - the plan is only ±10-15 cm.

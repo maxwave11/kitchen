@@ -47,14 +47,14 @@ windows:
   # Wall confirmed by Maxim (opposite the doorway). Position/size still unmeasured.
   - id: window
     wall: D-A
-    position: 78        # TODO: measure (cm from corner D to window edge)
-    width: 150          # TODO
+    position: 83        # TODO: measure (cm from corner D to window edge)
+    width: 156          # TODO
     sill_height: 85     # TODO
     height: 150         # TODO
     type: casement
     # PVC double-glazed unit from Maxim's photo (2026-11-08): two panes split by a mullion; the narrower one at corner D
     # is the opening sash (handle at the mullion), the wider one at A is fixed glazing. Mullion position is an estimate.
-    mullion: 62         # cm from the window's edge at corner D to the mullion centre
+    mullion: 67         # cm from the window's edge at corner D to the mullion centre
     opens: start        # start = the pane at corner D opens
 openings:
   # Wall confirmed by Maxim; position/width set in the 3D viewer (2026-11-07).
@@ -89,7 +89,8 @@ plumbing: []     # TODO: water supply / drain riser, ventilation, gas
 # a link, "=expression": a bare name is this object's own property, `id.name` is another object's ("=lower.height + lower.top").
 #   kitchen  one object: the palette (facade / carcass / worktop) of every `kitchen:` cabinet + two parts
 #     lower  height 90 / depth 60 / worktop 4 of every lower cabinet (change it once: all follow)
-#     upper  top of the upper cabinets (params.level); a cabinet with only an `elevation` reaches up to it
+#     upper  middle row over the worktop: params.level = its top (230); a cabinet with only an `elevation` reaches up to it
+#     mezz   top row of mezzanine cabinets: from upper.level up to params.level (270 = the ceiling)
 #   portal   its height is the single source: the opening door-1, the panel beside it, the cabinet over it follow
 # Saved from the 3D viewer (Maxim, 2026-11-07). Sink: Hansgrohe C51-F450-01, fridge: AEG bottom freezer,
 # both from Maxim's .3ds files (assets/models/). Sink cut-out is an estimate from the model - take the
@@ -108,27 +109,38 @@ objects:
     height: 90
     depth: 60
     top: 4
+  # Three rows (Maxim, 2026-11-08, from a reference photo): lower on the floor, `upper` = the middle row over the worktop
+  # (within reach, shallower), `mezz` = the top row of mezzanine cabinets up to the ceiling, over the whole kitchen run.
   - id: upper
-    label: "Верхняя часть"
+    label: "Средний ряд (над столешницей)"
     type: group
     parent: kitchen
-    depth: 40
+    depth: 35
     height: "=upper.level - elevation"
     params:
-      level: {value: 260, label: "Верх шкафов от пола"}
+      level: {value: 230, label: "Верх среднего ряда от пола"}
+  - id: mezz
+    label: "Верхний ряд (антресоли до потолка)"
+    type: group
+    parent: kitchen
+    depth: 60
+    elevation: "=upper.level"
+    height: "=mezz.level - elevation"
+    params:
+      level: {value: 270, label: "Верх антресолей (потолок)"}
   - id: e-base
     label: "Нижние шкафы (B-C)"
     parent: lower
     wall: B-C
-    position: 144
-    width: 162
+    position: 141.5
+    width: 165
     color: "#d8cfc4"
     kitchen: true
   - id: sink
     label: "Мойка Hansgrohe C51-F450-01"
     parent: kitchen
     wall: B-C
-    position: 173.1
+    position: 187
     gap: 5
     elevation: "=lower.height - 24.5"   # the basin hangs 24.5 cm under the worktop line
     width: 56
@@ -137,12 +149,12 @@ objects:
     model: assets/models/hansgrohe-c51-f450-01.glb
     cutout: {in: e-base, width: 53, depth: 49}
   - id: e-upper
-    label: "Верхний шкаф (B-C)"
+    label: "Средний шкаф (B-C)"
     parent: upper
     wall: B-C
-    position: 144
+    position: "=fridge.position + fridge.width"
     elevation: 160
-    width: 162
+    width: "=e-base.position + e-base.width - position"
     color: "#e9e6df"
     kitchen: true
   - id: fridge-panel
@@ -155,25 +167,17 @@ objects:
     height: "=portal.height"
     color: "#d8cfc4"
     kitchen: panel
+  # Built-in fridge (Maxim, 2026-11-08) instead of the free-standing AEG: a tall cabinet column from the floor up to the
+  # mezzanine row, between the portal panel and the base run. 59.5 wide = a 56 cm niche for a built-in fridge (check the
+  # model's niche size when it is chosen); the mezzanine over it (mezz-fridge) has the column's depth.
   - id: fridge
-    label: "Холодильник AEG"
+    label: "Колонна под встроенный холодильник"
     parent: kitchen
     wall: B-C
     position: 82
-    elevation: 2
-    width: 59.5
-    depth: 67.2
-    height: 184.5
-    model: assets/models/aeg-fridge-freezer-bottom-silver.glb
-  - id: fridge-top
-    label: "Шкаф над холодильником"
-    parent: upper
-    wall: B-C
-    position: 81
-    elevation: 190
-    width: 62
-    depth: 64
-    color: "#e9e6df"
+    width: "=e-base.position - position"
+    depth: 60
+    height: "=upper.level"
     kitchen: true
   - id: portal-shelf
     label: "Полка над порталом"
@@ -181,6 +185,7 @@ objects:
     wall: B-C
     position: "=portal.position"
     elevation: "=portal.height"
+    height: "=mezz.level - 10 - elevation"   # was "up to upper.level 260"; kept when the middle row dropped to 230
     width: "=portal.width + 1"
     depth: 64
     color: "#b08b5e"
@@ -207,17 +212,85 @@ objects:
     width: 180
     color: "#d8cfc4"
     kitchen: true
+  # Second wall cabinet (Maxim, 2026-11-08): along C-D over the hob, from the corner (behind e-upper's 40 cm depth)
+  # to the end of the n-base run; its bottom line follows e-upper.
+  - id: n-upper
+    label: "Средний шкаф (C-D)"
+    parent: upper
+    wall: C-D
+    position: "=upper.depth"
+    elevation: "=e-upper.elevation"
+    width: "=n-base.position + n-base.width - position"
+    color: "#e9e6df"
+    kitchen: true
+  # Top row: mezzanine cabinets up to the ceiling (height and elevation from `mezz`), over the fridge column and both runs.
+  - id: mezz-fridge
+    label: "Антресоль над холодильником"
+    parent: mezz
+    wall: B-C
+    position: "=fridge.position"
+    width: "=fridge.width"
+    depth: "=fridge.depth"
+    kitchen: true
+  - id: e-mezz
+    label: "Антресоли (B-C)"
+    parent: mezz
+    wall: B-C
+    position: "=e-upper.position"
+    width: "=e-upper.width"
+    kitchen: true
+  - id: n-mezz
+    label: "Антресоли (C-D)"
+    parent: mezz
+    wall: C-D
+    position: "=mezz.depth"
+    width: "=n-upper.position + n-upper.width - position"
+    kitchen: true
   - id: hob
     label: "Варочная панель"
     parent: kitchen
     wall: C-D
-    position: 85.5
+    position: 102.5
     gap: 4.1
     elevation: "=lower.height + lower.top"      # lies on the worktop
     width: 60
     depth: 52
     height: 1
     color: "#1d1d1d"
+    gloss: true                                 # glass ceramic: the same finish as the TV screen
+  # Built-in telescopic hood (Maxim, 2026-11-08) in the bottom of n-upper, centred over the hob, front flush with the facade.
+  # Generic 60 cm size (59.8 x 28 x 18); the pull-out visor is not modelled. Model not chosen yet - take the real sizes from it.
+  # Bottom at 160 = 66 cm over the hob (electric hobs: usually >= 65 cm, check the hood's manual).
+  - id: hood
+    label: "Вытяжка встраиваемая"
+    parent: kitchen
+    wall: C-D
+    position: "=hob.position + (hob.width - width) / 2"
+    gap: "=n-upper.gap + n-upper.depth - depth"
+    elevation: "=n-upper.elevation"
+    width: 59.8
+    depth: 28
+    height: 18
+    color: "#1d1d1d"
+    gloss: true                                 # black glass, as the hob and the oven
+    cutout: {in: n-upper, width: 60, depth: 28, height: 18}
+  # Oven Hafele 495.10.044 (SENSE SERIES combi, from Maxim's sources/*.3ds; the manufacturer file is an exploded CAD view: parts
+  # re-assembled by tds_to_glb.py --move, racks left out). 59.4 x 55.8 x 45 (incl. 1.4 cm handle), under the hob in the base run
+  # n-base: niche cut in the cabinet (cutout with height), front flush with the facade, top 1 cm under the worktop.
+  - id: oven
+    label: "Духовка Hafele 495.10.044"
+    parent: kitchen
+    wall: C-D
+    position: 105.5
+    gap: 4.5
+    elevation: 26
+    width: 59.4
+    depth: 55.8
+    height: 45
+    model: assets/models/hafele-495-10-044-combi-oven.glb
+    gloss: true                                 # black glass front: the same finish as the TV screen
+    mirror: {width: 56.4, height: 33.5, bottom: 1.5, back: 1.4}   # the door glass reflects the room like the TV screen
+    cutout: {in: n-base, width: 60, depth: 56, height: 46}
   # Bar table instead of the peninsula cabinet (Maxim, 2026-11-08): no carcass, four legs, movable.
   # Saved from the 3D viewer 2026-11-08: 70 x 150, top at 78 (no longer flush with the worktop), 62 cm from the C-D wall
   # (worktop front 60 + 2 cm overhang), 170 cm from corner C.
@@ -230,14 +303,16 @@ objects:
     type: table
     wall: C-D
     position: 170
-    gap: 62
+    gap: 56
     width: 70
     depth: 150
-    height: 78
+    height: 90
     top: 4
     leg: 5
     color: "#1e1e1e"
     kitchen: true
+    rotation: 0
+    elevation: 0
   # Rio chairs (Configura OBJ from Maxim's sources/Rio.obj, 2026-11-08) instead of the COR Jalis counter stools: same places
   # (centres kept), living-room side, facing the table (east). 50.4 x 50.8 x 80, seat ~43 cm. The colours are guessed from the
   # material names (CET light / dark dull blue, black): the .mtl is missing.
@@ -245,22 +320,25 @@ objects:
     label: "Стул Rio (1)"
     parent: bar-set
     wall: D-A
-    position: 74.4
-    gap: 271.6
+    position: 96
+    gap: 347
     width: 50.4
     depth: 50.8
     height: 80
     model: assets/models/rio-chair.glb
+    finish: plastic       # polypropylene (photoreal render)
+    rotation: 180
   - id: stool-2
     label: "Стул Rio (2)"
     parent: bar-set
     wall: D-A
-    position: 149.4
-    gap: 273.6
+    position: 87.5
+    gap: 272.5
     width: 50.4
     depth: 50.8
     height: 80
     model: assets/models/rio-chair.glb
+    finish: plastic       # polypropylene (photoreal render)
 
   # Sofa couch_015 from Maxim's sources/couch_015.max (2026-11-08). Moved to wall C-D, its end at the window wall,
   # as on Maxim's photo (sofa to the right of the window); the TV stands opposite, on A-B.
@@ -272,6 +350,8 @@ objects:
     depth: 83.5
     height: 50.4
     model: assets/models/couch-015.glb
+    finish: fabric        # upholstery: soft sheen in the photoreal render
+    color: "#a18c66"
 
   # Radiator under the window (Maxim's photo, 2026-11-08): steel panel type 22, profiled front, thermostatic valve on the
   # corner-D side, its end in line with the window edge there. Sizes estimated from the photo - measure.
@@ -300,19 +380,20 @@ objects:
     position: 40
     gap: 2
     width: 180
-    depth: 40
-    height: 64
+    depth: 25
+    height: 32
     doors: 3
     facade: "#f2f1ec"
     color: "#2a2522"
+    elevation: 28
   - id: tv
     label: "Телевизор LG OLED 65\""
     parent: tv-set
     type: tv
     wall: A-B
-    position: "=tv-stand.position + tv-stand.width - width - 10"
-    gap: "=tv-stand.gap + 6"
-    elevation: "=tv-stand.elevation + tv-stand.height"
+    position: 59
+    gap: -5.5
+    elevation: 60
     width: 144.1
     depth: 23
     height: 86.5
@@ -326,11 +407,12 @@ objects:
     type: rug
     wall: A-B
     position: 24.5
-    gap: 50
+    gap: 34.5
     width: 215
-    depth: 165.5
+    depth: 180
     height: 1
     color: "#cdc9c2"
+    elevation: 0
 
   # Slat partition between the kitchen and the living part (Maxim, 2026-11-08): same rails as the portal, floor to ceiling.
   # Runs N-S from the north wall C-D (position 0 = corner D); 266 cm from the west wall D-A = just behind the stools (back at 272.5),
@@ -339,14 +421,190 @@ objects:
     label: "Перегородка из реек"
     type: slats
     wall: D-A
-    position: 34
-    gap: 266
-    width: 44.5
+    position: 62
+    gap: 271
+    width: 72.5
     depth: 5
     height: 270
-    rails: 7
-    rail_width: 3
-    color: "#b08b5e"
+    rails: 10
+    rail_width: 3.5
+    color: "#321801"
+
+  # End shelving unit (Maxim's reference photo, 2026-11-08): floor-to-ceiling open shelves at the living-room end of the C-D run,
+  # open front facing the living part (west). A free object, not linked to the kitchen: it stands "against" B-C only to face west;
+  # back on the end of n-base (240 cm from B-C), 62 wide = flush with the worktop front (60 + 2 overhang), top at 260 = upper.level.
+  # White carcass, oak back panel and shelves, LED under every shelf. Shelf count / sizes / colours are editable in the viewer.
+  - id: end-shelf
+    label: "Торцевой стеллаж"
+    type: shelf
+    wall: B-C
+    position: 244.1
+    gap: 240
+    width: 62
+    depth: 25
+    height: 270
+    shelves: 5
+    board: 1.8
+    plinth: 8
+    color: "#150600"
+    inner: "#ded5cb"
+    lumens_m: 70
+    kelvin: 2700
+    led: true
+
+  # Scene lighting is configured here independently of the kitchen's local fixtures.
+  # The window's compass direction is unknown: the sun is set off the window.
+  - id: sun
+    label: "Солнце"
+    type: sun
+    window: window
+    illuminance: 16000  # lx of the direct beam: sun ~30-35 deg up on a clear day (midsummer noon ~100 000)
+    kelvin: 6400
+    altitude: 25        # degrees above the horizon
+    azimuth: 10         # degrees off the window's normal, + = towards corner A (the wall's second corner)
+  - id: sky
+    label: "Небо в окне"
+    type: sky
+    window: window
+    luminance: 8200     # cd/m2 of the sky + sunlit surroundings seen through the window on a clear day
+    kelvin: 5300
+    overcast: 1100      # cd/m2 on an overcast day
+    kelvin_overcast: 9200
+  - id: bounce
+    label: "Переотражённый свет"
+    type: bounce
+    reflectance: 50     # % mean reflectance of walls, floor, ceiling, furniture (light walls/ceiling, dark floor and kitchen)
+  - id: lighting
+    label: "Освещение"
+    type: group
+  # A bare bulb on a cord over the bar table (Maxim, 2026-11-08), 80 cm over the table top (LIGHT-01 ideal 76-91).
+  # Before the downlights: it gets a shadow map first (there are 8).
+  - id: bulb
+    label: "Лампочка над барным столом"
+    type: bulb
+    parent: lighting
+    wall: C-D
+    position: 270.5
+    gap: 144.5
+    elevation: 227
+    width: 6            # A60 bulb: 6 cm globe, 11 cm long
+    depth: 6
+    height: 11
+    lumens: 3000         # an LED A60, the output of an old 60 W bulb
+    kelvin: 2900
+    shadow: true
+
+  # Ceiling downlights (2026-11-08, for the viewer's evening lighting mode): a 2 x 4 grid, 130 cm apart along A-B and
+  # 152 cm across, 70-76 cm from the end walls, 77 cm from A-B and C-D; the column at x = 460 lies ~15 cm in front of the
+  # B-C worktop edge, the row at y = 229 ~15 cm in front of the C-D worktop edge. Proposal, not measured: move freely.
+  # The group holds the lamp settings, every lamp inherits them (lumens = light output, kelvin = colour temperature, beam = degrees).
+  - id: ceiling-lights
+    label: "Потолочные светильники"
+    type: group
+    parent: lighting
+    elevation: 269      # underside of the trim: ceiling 270 - 1
+    width: 9            # trim diameter
+    depth: 9
+    height: 1
+    lumens: 600         # a typical 7-8 W LED downlight; 8 x 600 lm over 16.4 m2 ~ 150-200 lx
+    kelvin: 3300        # warm white
+    beam: 95
+    shadow: true
+  - id: light-1
+    label: "Светильник 1"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 65.5
+    gap: 72.5
+  - id: light-2
+    label: "Светильник 2"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 195.5
+    gap: 72.5
+  - id: light-3
+    label: "Светильник 3"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 325.5
+    gap: 72.5
+  - id: light-4
+    label: "Светильник 4"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 455.5
+    gap: 72.5
+  - id: light-5
+    label: "Светильник 5"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 65.5
+    gap: 224.5
+  - id: light-6
+    label: "Светильник 6"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 195.5
+    gap: 224.5
+  - id: light-7
+    label: "Светильник 7"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 325.5
+    gap: 224.5
+  - id: light-8
+    label: "Светильник 8"
+    type: light
+    parent: ceiling-lights
+    wall: A-B
+    position: 455.5
+    gap: 224.5
+
+  # LED strips under the wall cabinets (2026-11-08): task light on the worktop, which the cabinets shade from the downlights.
+  # Aluminium profile with an opal diffuser, 3 cm behind the cabinet front; on C-D the strip stops at the hood (it has its own).
+  # Every number follows its cabinet by a link: resize or move the cabinet and the strip follows.
+  - id: cabinet-lights
+    label: "Подсветка под шкафами"
+    type: group
+    parent: lighting
+    depth: 1.7          # profile width
+    height: 0.7         # profile height
+    lumens_m: 500       # lm per metre: a common 4.8 W/m kitchen strip
+    kelvin: 3000        # the same warm white as the downlights
+  - id: strip-e
+    label: "Лента под шкафом (B-C)"
+    type: strip
+    parent: cabinet-lights
+    wall: B-C
+    position: "=e-upper.position"
+    width: 130
+    gap: "=e-upper.gap + e-upper.depth - depth - 3"
+    elevation: "=e-upper.elevation - height"
+  - id: strip-n1
+    label: "Лента под шкафом (C-D, у угла C)"
+    type: strip
+    parent: cabinet-lights
+    wall: C-D
+    position: "=n-upper.position"
+    width: "=hood.position - n-upper.position"
+    gap: "=n-upper.gap + n-upper.depth - depth - 3"
+    elevation: "=n-upper.elevation - height"
+  - id: strip-n2
+    label: "Лента под шкафом (C-D, за вытяжкой)"
+    type: strip
+    parent: cabinet-lights
+    wall: C-D
+    position: "=hood.position + hood.width"
+    width: "=n-upper.position + n-upper.width - position"
+    gap: "=n-upper.gap + n-upper.depth - depth - 3"
+    elevation: "=n-upper.elevation - height"
 
 zones: []
 focal_point:
@@ -357,6 +615,9 @@ furniture: []
 accessories: []
 
 notes: |
+  2026-11-08: three rows of cabinets (Maxim, reference photo): lower; middle row `upper` 160..230, 35 deep; top row `mezz`
+    (mezzanines 230..270 up to the ceiling, 40 deep) over both runs and the fridge. The free-standing AEG fridge replaced by
+    a tall kitchen column for a built-in fridge (82..141.5, 64 deep, floor..230) + mezz-fridge over it; fridge-top removed.
   2026-11-07: overall size from Maxim: 5.362 m x 3.061 m, ceiling 2.7 m.
   2026-11-07: doorway on wall B-C, window on opposite wall D-A (Maxim). Positions/sizes still placeholders.
   2026-11-07: sink Hansgrohe C51-F450-01 in the B-C base run (centre 201 cm from B, 3D model + worktop cut-out);
@@ -396,4 +657,11 @@ notes: |
     places, same centres.
   2026-11-08: viewer: one editable main colour `color` for simple objects (not for the table, tv, radiator, rug, doors, kitchen cabinets);
     models (sink, fridge, sofa, Rio chairs) lost their `color:` line - without it they show their own colours.
+  2026-11-08: combi oven Hafele 495.10.044 under the hob (59.4 x 55.8 x 45, niche in n-base); linked to the hob's position.
+  2026-11-08: `gloss: true` (finish of the TV screen) on the hob and the oven.
+  2026-11-08: 8 ceiling downlights (group ceiling-lights, 600 lm / 3000 K / 60 deg) for the viewer's lighting modes; layout is a proposal.
+  2026-11-14: sun, sky and bounce are scene settings; the lighting group holds the kitchen's local fixtures.
+  2026-11-08: LED strips under the wall cabinets (group cabinet-lights, 500 lm/m, 3000 K), linked to e-upper / n-upper / hood.
+  2026-11-08: end shelving unit 'end-shelf' (type: shelf, 62 x 30 x 260, 5 shelves, white + oak, LED) at the living-room end of the
+    C-D run, facing west (from Maxim's reference photo). Free object; overlaps the (hidden) slat partition by ~5 cm.
   TODO: exact window/door positions and sizes, utilities (water/drain riser for the sink). The plan shows only one doorway (door-1).

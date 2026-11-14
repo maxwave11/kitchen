@@ -39,6 +39,13 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       a manufacturer's .3ds converts with tools/room3d/tds_to_glb.py),
                cutout: {in: <object id>, width, depth}   # hole of that size, centred under this object,
                       through the other object's body and worktop (a sink in a base cabinet)
+               finish: fabric | wood | plastic | paint | satin | gloss | metal | chrome | stone -> what the object is made of,
+                      for the photoreal render only (render_mode.js: sheen, wood grain, roughness, clear coat...)
+               gloss: true  -> the finish of the TV screen (black glass, clear coat, reflections): a hob, an oven front;
+                      on a model every material of it becomes glossy, on a plain box its body.
+                      A glossy plain box also gets a real reflection on its top face (planar mirror, like the TV screen);
+                      a model gets one on its front glass: mirror: {width, height, bottom, back} (cm: size of the glass,
+                      its lower edge above the box bottom, its distance behind the box front)
                kitchen: true -> a kitchen cabinet: body in the carcass colour of the room's `type: kitchen` object,
                       a front panel in its facade colour (the side facing the room), worktop (`top`) in its worktop colour;
                kitchen: panel -> a plain board (end panel, divider) wholly in the carcass colour, no front;
@@ -64,6 +71,12 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       first at `position`, last ends at position + width); rail_width = one slat along the wall,
                       depth = slat thickness, height from `elevation` (270 = to the ceiling). A free-standing partition:
                       stand it against the wall that is parallel to it and move it away with `gap`
+               type: shelf   -> an open shelving unit (bookcase), its open front into the room: sides, top, bottom,
+                      back panel; shelves = inner shelves spread evenly between the bottom and the top (default 4),
+                      board = board thickness (1.8), plinth = recessed plinth height under the bottom (0 = none),
+                      color = carcass, inner = back panel and shelves ("#rrggbb"); lumens_m > 0 = an LED strip under
+                      every shelf and the top (lm per metre, kelvin; on in the evening light mode); led: false = the shelf
+                      lighting is switched off (default true)
                type: table   -> a slab (`top` thick, default 4) on four square legs (`leg` section, default 5),
                       5 cm in from the edges; height = to the top surface; kitchen: true = slab in the worktop colour
                doors: N      -> any plain box gets N equal doors on its room side in `facade` ("#rrggbb", default white),
@@ -73,6 +86,23 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       The screen is a real mirror (three.js Reflector): it reflects the room
                type: radiator -> steel panel radiator: profiled front, top grille; valve: start | end = side of the
                       thermostatic valve (default end); gap = distance from the wall (brackets)
+               type: light   -> a ceiling downlight: a round recessed fixture (width = diameter, height = visible trim,
+                      elevation = its underside, i.e. ceiling - height) and a real spot light pointing down, ON in the
+                      viewer's "Вечер" lighting mode. lumens (light output), kelvin (colour temperature), beam (beam angle,
+                      degrees). All three and width / depth / height / elevation are inherited from a `type: group` parent, so
+                      one group holds the settings of every lamp in it
+               type: strip   -> an LED strip in an aluminium profile with an opal diffuser, on the underside of a wall
+                      cabinet (width = length along the wall, depth / height = the profile, elevation = its underside):
+                      an area light shining down onto the worktop, ON in the "Вечер" mode. lumens_m (lumens per metre),
+                      kelvin. Inherited from a `type: group` parent like the downlights'
+               type: bulb    -> a bare bulb hanging on a cord from the ceiling (frosted globe, socket, ceiling rose): a point
+                      light shining every way, the ceiling too; width = globe diameter, height = the bulb, elevation = its
+                      bottom; lumens, kelvin. ON in the "Вечер" mode
+               type: sun / sky / bounce -> light sources without a wall (no position / sizes):
+                      sun: illuminance (lx of the direct beam), kelvin, altitude, azimuth (degrees off the normal of its
+                      `window:`), used in the "Солнце" mode; sky: luminance / kelvin (clear day) and overcast /
+                      kelvin_overcast (the sky seen through `window:`, none = every window); bounce: reflectance (%), the
+                      indirect light of all sources
                type: rug     -> a flat rug (height = pile, ~1 cm) with a striped vintage pattern; the stripes run
                       along the width; color = base colour
 
@@ -97,6 +127,7 @@ import yaml
 HERE = Path(__file__).resolve().parent
 SPATIAL = HERE.parent / "planhaus" / "scripts" / "room_spatial.py"
 TEMPLATE = HERE / "viewer_template.html"
+RENDER_MODE = HERE / "render_mode.js"                # the photoreal render mode, inlined into the page (<!--__RENDER_MODE__-->)
 
 DEFAULT_HEIGHTS = {
     "sofa": 85, "armchair": 85, "coffee-table": 42, "side-table": 55,
@@ -129,9 +160,14 @@ def by_id(items):
 
 REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
            "against": "wall", "group": "parent: <id of a type: group object>"}
-SHAPES = ("portal", "slats", "table", "tv", "radiator", "rug")      # objects drawn in their own way (not a plain box)
-CONTAINERS = ("group", "kitchen")                     # objects without geometry: they hold the sizes their children inherit
+SHAPES = ("portal", "slats", "shelf", "table", "tv", "radiator", "rug", "light", "strip", "bulb")      # objects drawn in their own way (not a plain box)
+# what an object is made of, for the photoreal render (render_mode.js); the viewer itself does not use it
+FINISHES = ("fabric", "wood", "plastic", "paint", "satin", "gloss", "metal", "chrome", "stone")
+CONTAINERS = ("group", "kitchen")
+ENV = ("sun", "sky", "bounce")                      # light sources without a place in the room: no wall                     # objects without geometry: they hold the sizes their children inherit
 NUMERIC = ("position", "gap", "elevation", "rotation", "width", "depth", "height", "top")
+LIGHT = ("lumens", "lumens_m", "kelvin", "beam", "illuminance", "altitude", "azimuth", "luminance", "overcast",
+         "kelvin_overcast", "reflectance")                  # a type: light lamp (or a group of them: inherited)
 
 
 def raw(v, default=None):
@@ -152,8 +188,8 @@ def make_object(o, wall_ids, embed_model, where):
     if bad:
         sys.exit(f"{where}[{o['id']}]: not allowed: {', '.join(bad)}. An object has wall + position + gap and "
                  f"width (along the wall) x depth (away from it) x height")
-    kind = o.get("type") if o.get("type") in SHAPES + CONTAINERS else None
-    if kind not in CONTAINERS and o.get("wall") not in wall_ids:
+    kind = o.get("type") if o.get("type") in SHAPES + CONTAINERS + ENV else None
+    if kind not in CONTAINERS + ENV and o.get("wall") not in wall_ids:
         sys.stderr.write(f"{where}[{o['id']}]: wall {o.get('wall')!r} is not a wall of this room "
                          f"({', '.join(sorted(wall_ids))}), skipped\n")
         return None
@@ -169,7 +205,17 @@ def make_object(o, wall_ids, embed_model, where):
         "cutout": o.get("cutout") if isinstance(o.get("cutout"), dict) else None,
         "kitchen": "panel" if o.get("kitchen") == "panel" else bool(o.get("kitchen")),
         "facade_side": o.get("facade_side") if o.get("facade_side") in ("start", "end") else None,
+        "gloss": bool(o.get("gloss")),
+        "mirror": o["mirror"] if isinstance(o.get("mirror"), dict) else None,
+        "finish": o.get("finish") if o.get("finish") in FINISHES else None,
     }
+    if o.get("finish") is not None and o.get("finish") not in FINISHES:
+        sys.stderr.write(f"{where}[{o['id']}]: finish {o.get('finish')!r} unknown ({', '.join(FINISHES)}), ignored\n")
+    out.update({k: raw(o.get(k)) for k in LIGHT if o.get(k) is not None})
+    if isinstance(o.get("shadow"), bool):                # shadow: false = this light (or a group of lamps) casts no shadows
+        out["shadow"] = o["shadow"]
+    if o.get("window"):
+        out["window"] = str(o["window"])
     if kind == "kitchen":
         out.update({k: str(o.get(k) or COLORS["other"]) for k in ("facade", "carcass", "worktop")})
     if kind == "portal":
@@ -177,6 +223,10 @@ def make_object(o, wall_ids, embed_model, where):
                     "rail_thickness": raw(o.get("rail_thickness"), 4)})
     elif kind == "slats":
         out.update({"rails": raw(o.get("rails"), 10), "rail_width": raw(o.get("rail_width"), 4)})
+    elif kind == "shelf":
+        out.update({"shelves": raw(o.get("shelves"), 4), "board": raw(o.get("board"), 1.8), "plinth": raw(o.get("plinth"), 0),
+                    "inner": str(o.get("inner") or "#b08b5e"),
+                    "led": o.get("led") is not False})
     elif kind == "table":
         out.update({"top": raw(o.get("top"), 4), "leg": raw(o.get("leg"), 5)})
     elif kind == "tv":
@@ -202,7 +252,7 @@ def check_links(objects, openings, where):
                 sys.exit(f"{where}[{o['id']}]: parent loop")
             seen.add(q["id"]); q = by.get(q["parent"])
     for o in [*objects, *openings]:
-        vals = [o.get(k) for k in NUMERIC + ("sill",)] + [p["value"] for p in o.get("params", {}).values()]
+        vals = [o.get(k) for k in NUMERIC + LIGHT + ("sill",)] + [p["value"] for p in o.get("params", {}).values()]
         for v in vals:
             for ref in re.findall(r"([A-Za-z_][\w-]*)\.[A-Za-z_]", v) if isinstance(v, str) else []:
                 if ref not in ids:
@@ -372,6 +422,9 @@ def main():
     out = Path(args.out) if args.out else Path("viewer") / f"{room.get('id') or room_path.stem}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     html = TEMPLATE.read_text(encoding="utf-8")
+    if RENDER_MODE.is_file():                        # before the room data: the data can never contain the marker
+        html = html.replace("<!--__RENDER_MODE__-->",
+                            '<script type="module">\n' + RENDER_MODE.read_text(encoding="utf-8") + "\n</script>")
     html = html.replace("__TITLE__", args.title or f"3D: {data['name']}")
     html = html.replace("__ROOM_DATA__", json.dumps(data, ensure_ascii=False))
     out.write_text(html, encoding="utf-8")

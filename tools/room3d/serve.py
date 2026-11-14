@@ -32,8 +32,12 @@ VIEWER = ROOT / "viewer"
 LOCK = threading.Lock()                          # one save / rebuild at a time
 
 NUMBERS = {"position", "gap", "elevation", "rotation", "width", "depth", "height", "top",
-           "rails", "rail_width", "rail_thickness", "leg", "sill", "mullion", "doors", "panel", "stand"}
-COLORS = {"facade", "carcass", "worktop", "color"}
+           "rails", "rail_width", "rail_thickness", "shelves", "board", "plinth", "leg", "sill", "mullion", "doors", "panel", "stand",
+           "lumens", "lumens_m", "kelvin", "beam",
+           "illuminance", "altitude", "azimuth", "luminance", "overcast", "kelvin_overcast", "reflectance"}
+COLORS = {"facade", "carcass", "worktop", "color", "inner"}
+BOOLS = {"led", "shadow"}                                 # on / off switches: true | false
+CHOICES = {"finish": {"fabric", "wood", "plastic", "paint", "satin", "gloss", "metal", "chrome", "stone"}}   # a word from a list
 LINK = re.compile(r"^=[\w\s.+\-*/()]*$")        # "=lower.height + lower.top"
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 YAML_KEY = {"sill": "sill_height"}              # viewer name -> YAML name (windows)
@@ -60,13 +64,19 @@ def split_value(rest):
 
 
 def fmt(v, key):
+    if isinstance(v, bool) and key in BOOLS:
+        return "true" if v else "false"
     if isinstance(v, bool) or not isinstance(v, (int, float, str)):
         raise BadRequest(f"{key}: unsupported value {v!r}")
+    if isinstance(v, str) and key in CHOICES:
+        if v not in CHOICES[key]:
+            raise BadRequest(f"{key}: bad value {v!r}")
+        return v
     if isinstance(v, str):
         if not (LINK.match(v) or (key in COLORS and HEX.match(v))):
             raise BadRequest(f"{key}: bad value {v!r}")
         return json.dumps(v, ensure_ascii=False)
-    if not math.isfinite(v) or abs(v) > 100000:
+    if not math.isfinite(v) or abs(v) > 1000000:                  # the sun's illuminance goes up to 110 000 lx
         raise BadRequest(f"{key}: bad number {v!r}")
     return f"{v:.4f}".rstrip("0").rstrip(".") if v != int(v) else str(int(v))
 
@@ -190,11 +200,11 @@ def apply_changes(room_id, changes):
         # keys are validated first, then patched; line numbers shift after an insert / delete, so look the item up again each time
         edits = [(k, fmt(v, k)) for k, v in sets.items()] + [(k, None) for k in dels]
         for k, new in edits:
-            if k not in NUMBERS and k not in COLORS and not re.fullmatch(r"[A-Za-z_]\w*", k):
+            if k not in NUMBERS and k not in COLORS and k not in BOOLS and not re.fullmatch(r"[A-Za-z_]\w*", k):
                 raise BadRequest(f"bad field {k!r}")
             start, end, ind = find_item(L, lo, hi, item_id)
             ykey = YAML_KEY.get(k, k) if kind == "window" else k
-            if k in NUMBERS or k in COLORS:
+            if k in NUMBERS or k in COLORS or k in BOOLS or k in CHOICES:
                 shift = patch_item(L, start, end, ind, ykey, new)
                 hi += shift
             elif new is not None and not patch_param(L, start, end, k, new):
@@ -218,7 +228,7 @@ def write_atomic(path, text):
 def stale(html, room_yaml):
     if not html.is_file():
         return True
-    srcs = [room_yaml, ROOT / "apartment.yaml", HERE / "viewer_template.html", HERE / "build_room_3d.py"]
+    srcs = [room_yaml, ROOT / "apartment.yaml", HERE / "viewer_template.html", HERE / "render_mode.js", HERE / "build_room_3d.py"]
     return any(s.is_file() and s.stat().st_mtime > html.stat().st_mtime for s in srcs)
 
 

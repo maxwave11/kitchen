@@ -12,8 +12,9 @@ What it does:
   - computes vertex normals from the 3DS smoothing groups (hard edges stay hard);
   - converts axes: 3DS is Z-up, glTF is Y-up: (x, y, z) -> (x, z, -y). So the model's -Y side
     (the front in 3DS) becomes +Z, which is the glTF "front" the viewer turns towards the room;
+  - --list prints the objects; --drop / --move leave out or shift single objects (exploded manufacturer models);
   - merges all objects into one mesh with one primitive per material; units are kept (--scale to change).
---mat NAME=#rrggbb:metalness:roughness overrides a material (3DS has no PBR data; e.g. chrome = :1:0.15).
+--mat NAME=#rrggbb:metalness:roughness[:alpha] overrides a material (3DS has no PBR data; e.g. chrome = :1:0.15).
 """
 import argparse
 import json
@@ -150,10 +151,12 @@ def write_glb(path, prims, materials, overrides, name, copyright_):
         src = materials.get(mat, {})
         rgb = src.get("diffuse") or [0.8, 0.8, 0.8]
         metal, rough = 0.0, 0.6
+        alpha_override = None
         if mat in overrides:
-            rgb, metal, rough = overrides[mat]
+            rgb, metal, rough, *rest = overrides[mat]
+            alpha_override = rest[0] if rest else None
         lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]   # glTF colours are linear
-        alpha = 1.0 - src.get("transparency", 0.0)
+        alpha = 1.0 - src.get("transparency", 0.0) if alpha_override is None else alpha_override
         m = {"name": mat, "pbrMetallicRoughness": {"baseColorFactor": [*lin, alpha], "metallicFactor": metal,
                                                     "roughnessFactor": rough}}
         if alpha < 1:
@@ -198,16 +201,32 @@ def main():
     ap.add_argument("--scale", type=float, default=1.0, help="multiply coordinates (3DS units -> metres)")
     ap.add_argument("--mat", action="append", default=[], metavar="NAME=#rrggbb:metal:rough")
     ap.add_argument("--copyright", default="")
+    ap.add_argument("--list", action="store_true", help="only list the objects (name, faces, bbox in file units)")
+    ap.add_argument("--drop", action="append", default=[], metavar="OBJECT", help="leave this object out (repeatable)")
+    ap.add_argument("--move", action="append", default=[], metavar="OBJECT=dx,dy,dz",
+                    help="shift an object, in FILE units and 3DS axes (x east, y depth, z up); for exploded manufacturer models")
     args = ap.parse_args()
 
     overrides = {}
     for spec in args.mat:
         name, val = spec.split("=", 1)
-        col, metal, rough = (val.split(":") + ["0", "0.6"])[:3]
+        col, metal, rough, *alpha = val.split(":") + ["0", "0.6"][len(val.split(":")) - 1:]
         col = col.lstrip("#")
-        overrides[name] = ([int(col[i:i + 2], 16) / 255 for i in (0, 2, 4)], float(metal), float(rough))
+        overrides[name] = ([int(col[i:i + 2], 16) / 255 for i in (0, 2, 4)], float(metal), float(rough), *(float(x) for x in alpha[:1]))
 
     materials, objects = parse_3ds(Path(args.src).read_bytes())
+    if args.list:
+        for ob in objects:
+            lo = [round(min(v[k] for v in ob["verts"])) for k in range(3)]
+            hi = [round(max(v[k] for v in ob["verts"])) for k in range(3)]
+            print(f"  {ob['name']}: {len(ob['faces'])} faces, {sorted({g for g, _ in ob['groups']})}, bbox {lo} .. {hi}")
+        return
+    moves = {n: [float(x) for x in v.split(",")] for n, v in (m.split("=", 1) for m in args.move)}
+    objects = [ob for ob in objects if ob["name"] not in args.drop]
+    for ob in objects:
+        if ob["name"] in moves:
+            d = moves[ob["name"]]
+            ob["verts"] = [(x + d[0], y + d[1], z + d[2]) for x, y, z in ob["verts"]]
     prims = build_primitives(objects, args.scale)
     gltf = write_glb(args.out, prims, materials, overrides, Path(args.out).stem, args.copyright)
     lo = [min(a["min"][k] for a in gltf["accessors"] if "min" in a) for k in range(3)]
