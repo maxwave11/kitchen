@@ -6,7 +6,7 @@
 //    the tracer bounces the light itself; a sky environment outside lights the room through the window instead;
 //  - meshes the tracer cannot draw are left out: invisible click boxes (one fills the window!), zone overlays (MeshBasicMaterial);
 //  - the window panes become real glass that shadow rays pass (their 70 % transmittance is in the sun and the sky);
-//  - the TV / oven mirrors (Reflector, a custom shader) become glossy black glass;
+//  - dark glass reflectors become glossy black glass, and wall mirrors become polished silver;
 //  - camera INSIDE the room: every wall and the ceiling stand (honest light); OUTSIDE: the viewer's cutaway decides the walls and the
 //    ceiling goes when the camera is above it (a doll's house: the light leaks in where the walls are cut - shown in the status).
 // The viewer calls the hooks around every applyMode (every light change and every build()): the scene is put back before it changes
@@ -350,7 +350,7 @@ const FINISH = {                                                     // physical
   satin:   () => ({ roughness: .35, metalness: 0, clearcoat: .3, clearcoatRoughness: .3 }),
   gloss:   () => ({ roughness: .2, metalness: 0, clearcoat: 1, clearcoatRoughness: .05 }),
   metal:   () => ({ roughness: .32, metalness: 1 }),
-  chrome:  () => ({ roughness: .05, metalness: 1 }),
+  chrome:  () => ({ ...V.chrome, color: new W.Color(V.chrome.color), map: null, roughnessMap: null }),
   stone:   () => ({ roughness: .3, metalness: 0, clearcoat: .2, clearcoatRoughness: .2 }),
 };
 const matCache = new WeakMap();                                      // original material -> its render version (per finish)
@@ -383,7 +383,7 @@ function renderMaterial(o, m) {                                      // the rend
 }
 
 // ---------- capturing the viewer's scene for the tracer ----------
-let glassMat, screenMat;
+let glassMat, screenMat, mirrorMat;
 function cameraInside() {                                            // in the room's outline (plan) and under its ceiling
   const p = V.camera.position, x = p.x / V.S, y = -p.z / V.S, z = p.y / V.S, pts = V.R.walls.map(w => w.a);
   let inPlan = false;
@@ -396,6 +396,7 @@ function cameraInside() {                                            // in the r
 function prepare() {
   glassMat ||= new W.MeshPhysicalMaterial({ color: 0xf7f9f8, roughness: 0, metalness: 0, transmission: 1, ior: 1.5, thickness: .004 });
   screenMat ||= new W.MeshPhysicalMaterial({ color: 0x050505, roughness: .03, metalness: 0, clearcoat: 1, clearcoatRoughness: .02 });
+  mirrorMat ||= new W.MeshPhysicalMaterial({ color: 0xf3f3f3, roughness: .01, metalness: 1 });
   const S = V.scene, above = V.camera.position.y / V.S >= V.H;
   inside = cameraInside();
   saved = { env: S.environment, envI: S.environmentIntensity, bg: S.background, mats: [], vis: [], added: [] };
@@ -437,7 +438,7 @@ function prepare() {
     if (!o.isMesh || !o.visible) return;
     const m = o.material, ms = [m].flat();
     if (lensMats.has(m)) prop(o, 'visibleToShadowRays', false);
-    if (o.isReflector) { saved.mats.push([o, m]); o.material = screenMat; return; }
+    if (o.isReflector) { saved.mats.push([o, m]); o.material = o.userData.wallMirror ? mirrorMat : screenMat; return; }
     if (ms.every(x => x?.visible === false) || !ms.every(x => x?.isMeshStandardMaterial)) { set(o, false); return; }   // click boxes, zones
     if (m === V.ceilMat && !inside && above) { set(o, false); return; }
     if (m.transparent && m.opacity < .5 && m.isMeshPhysicalMaterial) {   // window panes

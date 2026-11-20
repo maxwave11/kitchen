@@ -39,6 +39,7 @@ Extra 3D-only fields are read straight from the YAML; all are optional:
                       a manufacturer's .3ds converts with tools/room3d/tds_to_glb.py),
                cutout: {in: <object id>, width, depth}   # hole of that size, centred under this object,
                       through the other object's body and worktop (a sink in a base cabinet)
+               cutaway: [B-C, C-D]  # hide this object when seen from outside any of these room edges, like a wall
                finish: fabric | wood | plastic | paint | satin | gloss | metal | chrome | stone -> what the object is made of,
                       for the photoreal render only (render_mode.js: sheen, wood grain, roughness, clear coat...)
                gloss: true  -> the finish of the TV screen (black glass, clear coat, reflections): a hob, an oven front;
@@ -160,7 +161,7 @@ def by_id(items):
 
 REMOVED = {"x": "wall + position + gap", "y": "wall + position + gap", "sx": "width / depth", "sy": "width / depth",
            "against": "wall", "group": "parent: <id of a type: group object>"}
-SHAPES = ("portal", "slats", "shelf", "table", "tv", "radiator", "rug", "light", "strip", "bulb")      # objects drawn in their own way (not a plain box)
+SHAPES = ("portal", "slats", "shelf", "table", "tv", "mirror", "radiator", "rug", "light", "strip", "bulb")      # objects drawn in their own way (not a plain box)
 # what an object is made of, for the photoreal render (render_mode.js); the viewer itself does not use it
 FINISHES = ("fabric", "wood", "plastic", "paint", "satin", "gloss", "metal", "chrome", "stone")
 CONTAINERS = ("group", "kitchen")
@@ -178,6 +179,33 @@ def raw(v, default=None):
         return float(v) if v is not None else default
     except (TypeError, ValueError):
         return default
+
+
+def cabinet_variants(o, where):
+    variants = o["variants"]
+    if not isinstance(variants, dict) or not variants:
+        sys.exit(f"{where}[{o['id']}]: variants must be a non-empty mapping")
+    for key, style in variants.items():
+        if not isinstance(key, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", key) or not isinstance(style, dict):
+            sys.exit(f"{where}[{o['id']}]: invalid cabinet variant {key!r}")
+        for field, value in style.items():
+            valid = (
+                field == "label" and isinstance(value, str) and bool(value.strip())
+                or field in ("facade", "carcass") and isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value)
+                or field == "carcass_finish" and value in ("wood", "paint")
+                or field == "side_material" and isinstance(value, str) and bool(value)
+                or field == "fluted_facade" and isinstance(value, bool)
+                or field == "facade_border" and type(value) in (float, int) and 0 <= value <= 3
+                or field == "facade_gap" and type(value) in (float, int) and 0 <= value <= 5
+                or field in ("pull_cutout", "lower_pull") and type(value) in (float, int) and 0 <= value <= 5
+                or field == "open_niche" and type(value) in (float, int) and 0 <= value < float("inf")
+            )
+            if not valid:
+                sys.exit(f"{where}[{o['id']}]: invalid {field!r} in cabinet variant {key!r}")
+    active = o.get("variant", next(iter(variants)))
+    if not isinstance(active, str) or active not in variants:
+        sys.exit(f"{where}[{o['id']}]: unknown cabinet variant {active!r}")
+    return {"variants": variants, "variant": active}
 
 
 def make_object(o, wall_ids, embed_model, where):
@@ -212,12 +240,29 @@ def make_object(o, wall_ids, embed_model, where):
     if o.get("finish") is not None and o.get("finish") not in FINISHES:
         sys.stderr.write(f"{where}[{o['id']}]: finish {o.get('finish')!r} unknown ({', '.join(FINISHES)}), ignored\n")
     out.update({k: raw(o.get(k)) for k in LIGHT if o.get(k) is not None})
+    if o.get("model") and isinstance(o.get("smooth_angle"), (int, float)) and not isinstance(o["smooth_angle"], bool):
+        angle = o["smooth_angle"]
+        if 1 <= angle <= 180:
+            out["smooth_angle"] = angle
+    if o.get("wall_tile") is True:
+        out["wall_tile"] = True
+    if o.get("follow_wall_cutaway") is True:
+        out["follow_wall_cutaway"] = True
+    if "cutaway" in o:
+        edges = o["cutaway"]
+        if not isinstance(edges, list) or any(not isinstance(e, str) or e not in wall_ids for e in edges):
+            sys.exit(f"{where}[{o['id']}]: cutaway must be a list of this room's wall IDs")
+        out["cutaway"] = edges
     if isinstance(o.get("shadow"), bool):                # shadow: false = this light (or a group of lamps) casts no shadows
         out["shadow"] = o["shadow"]
     if o.get("window"):
         out["window"] = str(o["window"])
     if kind == "kitchen":
         out.update({k: str(o.get(k) or COLORS["other"]) for k in ("facade", "carcass", "worktop")})
+    elif kind == "group":
+        out.update({k: str(o[k]) for k in ("facade", "carcass", "worktop") if o.get(k)})
+    if o.get("palette_role") in ("carcass", "worktop"):
+        out["palette_role"] = o["palette_role"]
     if kind == "portal":
         out.update({"rails": raw(o.get("rails"), 6), "rail_width": raw(o.get("rail_width"), 2),
                     "rail_thickness": raw(o.get("rail_thickness"), 4)})
@@ -235,6 +280,14 @@ def make_object(o, wall_ids, embed_model, where):
         out["valve"] = "start" if o.get("valve") == "start" else "end"
     if o.get("doors") is not None:
         out.update({"doors": raw(o.get("doors"), 0), "facade": str(o.get("facade") or "#f2f0eb")})
+        if o.get("facade_layout") in ("drawers", "stacked"):
+            out["facade_layout"] = o["facade_layout"]
+        if o.get("fluted_facade") is True:
+            out["fluted_facade"] = True
+        if type(o.get("open_niche")) in (int, float) and o["open_niche"] > 0:
+            out["open_niche"] = o["open_niche"]
+        if "variants" in o:
+            out.update(cabinet_variants(o, where))
     return out
 
 
@@ -259,7 +312,7 @@ def check_links(objects, openings, where):
                     sys.exit(f"{where}[{o['id']}]: link {v!r} names {ref!r}, which is not an object or opening of this room")
 
 
-def load_apartment(path, room_id, required, embed_model):
+def load_apartment(path, room_id, required, embed_model, embed_texture, cabinet_materials):
     """Other rooms of the apartment, in this room's coordinates: the same parts as the main room."""
     if not path.is_file():
         if required:
@@ -270,6 +323,8 @@ def load_apartment(path, room_id, required, embed_model):
         if required:
             sys.exit(f"{path}: frame is {apt.get('frame')!r}, not {room_id!r}")
         return []
+    for name, material in (apt.get("cabinet_materials") or {}).items():
+        cabinet_materials[name] = {**material, "image": embed_texture(material["image"], path.parent)}
     boxes = lambda rows, n: [[float(v) for v in r] for r in rows or [] if isinstance(r, list) and len(r) in n]
 
     rooms = []
@@ -286,6 +341,8 @@ def load_apartment(path, room_id, required, embed_model):
             "id": r["id"], "name": r.get("name") or r["id"], "area_m2": r.get("area_m2"),
             "floor": floor,
             "floor_color": r.get("floor_color"),             # none = the kitchen's laminate
+            **{key: {**r[key], "image": embed_texture(r[key]["image"], path.parent)}
+               for key in ("floor_tile", "wall_tile") if key in r},
             "walls": boxes(r.get("walls"), (4, 6)), "glass": boxes(r.get("glass"), (6,)),
             "objects": objects,
         })
@@ -389,6 +446,15 @@ def main():
 
     wall_ids = {w["id"] for w in walls}
     models = {}
+    textures = {}
+
+    def embed_texture(ref, directory):
+        if ref not in textures:
+            path = directory / ref
+            if not path.is_file():
+                sys.exit(f"texture {path}: not found")
+            textures[ref] = "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode()
+        return ref
 
     def embed_model(oid, ref):
         if ref in models:
@@ -405,12 +471,18 @@ def main():
     if room.get("kitchen_colors"):
         sys.exit("kitchen_colors: is gone - put facade / carcass / worktop on the `type: kitchen` object in objects:")
     room_id = room.get("id") or room_path.stem
+    cabinet_materials = {}
+    apartment = load_apartment(Path(args.apartment) if args.apartment else room_path.parent.parent / "apartment.yaml",
+                               room_id, bool(args.apartment), embed_model, embed_texture, cabinet_materials)
+    for o in [*objects, *(obj for r in apartment for obj in r["objects"])]:
+        for style in o.get("variants", {}).values():
+            if "side_material" in style and style["side_material"] not in cabinet_materials:
+                sys.exit(f"objects[{o['id']}]: unknown cabinet material {style['side_material']!r}")
 
     data = {
-        "objects": objects, "models": models,
+        "objects": objects, "models": models, "textures": textures,
         "id": room_id,
-        "apartment": load_apartment(Path(args.apartment) if args.apartment else room_path.parent.parent / "apartment.yaml",
-                                    room_id, bool(args.apartment), embed_model),
+        "apartment": apartment, "cabinet_materials": cabinet_materials,
         "name": room.get("name") or room.get("id") or room_path.stem,
         "area_m2": (room.get("validation") or {}).get("calculated_area") or room.get("area_m2"),
         "ceiling": ceiling, "thickness": thickness, "walls": walls, "holes": holes,

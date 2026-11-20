@@ -148,6 +148,8 @@ objects:
     height: 62.5
     model: assets/models/hansgrohe-c51-f450-01.glb
     cutout: {in: e-base, width: 53, depth: 49}
+    finish: chrome
+    smooth_angle: 80
   - id: e-upper
     label: "Средний шкаф (B-C)"
     parent: upper

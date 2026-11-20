@@ -19,7 +19,7 @@ Create a new interior design project with all required files.
    ```
 
 3. The new project will contain:
-   - `CLAUDE.md` — design rules and conventions
+   - `AGENTS.md` — design rules and conventions
    - `brief.yaml` — client profile template (programming phase input)
    - `concept.yaml` — design concept template (narrative, style, palette, budget)
    - `apartment.yaml` — apartment layout template
@@ -39,7 +39,7 @@ Create a new interior design project with all required files.
 
 ## Notes
 
-- The CLAUDE.md contains all design conventions and coordinate system rules.
+- The AGENTS.md contains all design conventions and coordinate system rules.
 - brief.yaml is client input only — keep it high-level, no room-level specs.
 - Never place furniture before zones and circulation exist; never select FF&E before the layout fixes dimensions.
 - For each room, copy `rooms/_template.yaml` to `rooms/<room-name>.yaml`.

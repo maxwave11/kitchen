@@ -14,7 +14,7 @@ old registry entries without them stay valid.
 
 1. Gather the data, depending on the source:
    - **URL provided**: fetch the product page with **WebFetch** (it runs host-side).
-     Do **NOT** use `curl`/`wget` in Bash — the Cowork VM blocks arbitrary egress.
+     Use the web tools provided by the current environment.
      Extract: name, price + currency, dimensions (W × D × H cm), materials, colors, finish.
    - **From `/planhaus-select`**: carry over the catalog metadata from the picked
      candidate (category, style tags, color_family, primary_material, dimensions, price,

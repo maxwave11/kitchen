@@ -4,14 +4,14 @@
 
 ## С чего начинать
 
-- Главный скилл проекта: `kitchen-living-planner` (`.claude/skills/kitchen-living-planner/SKILL.md`).
+- Главный скилл проекта: `kitchen-living-planner` (`.agents/skills/kitchen-living-planner/SKILL.md`).
   Он ведёт по шагам: замеры → `rooms/kitchen-living.yaml` → проверка правил → 2D-план → 3D-модель.
 - Вся геометрия — только в `rooms/kitchen-living.yaml` (формат planhaus, см, начало координат — угол A,
   X — восток, Y — север). Не держать размеры только в чате.
-- Команды запускать из корня репозитория. Зависимости: `python3 -m pip install -q -r tools/planhaus/scripts/requirements.txt`.
-- После каждого изменения комнаты: `python3 tools/planhaus/scripts/room_spatial.py rooms/<room>.yaml --check`
+- Запуск на Windows: `start-planner.bat`. Команды запускать из корня репозитория. Для инструментов планировки установите зависимости через `py -3.11 -m pip install -r tools/planhaus/scripts/requirements.txt`.
+- После каждого изменения комнаты: `py -3.11 tools/planhaus/scripts/room_spatial.py rooms/<room>.yaml --check`
   (в планхаусе это делал хук; здесь — вручную).
-- 3D: `python3 tools/room3d/build_room_3d.py rooms/<room>.yaml -o viewer/<room>.html`.
+- 3D: `py -3.11 tools/room3d/build_room_3d.py rooms/<room>.yaml -o viewer/<room>.html`.
 - Остальная квартира (коридор, спальни, ванная, туалет, лоджия) — контекст для 3D в `apartment.yaml`,
   в координатах кухни, снята с плана застройщика `docs/apartment-plan.png` (точность ±10–15 см).
 - **Все помещения устроены одинаково** (кухня-гостиная — обычное помещение, не особенное): пол, стены, проёмы,
@@ -48,7 +48,7 @@
    `parent:` — группа, если предмет входит в набор/кухню. Приписать строку в `notes:` с датой и откуда файл.
 6. **Сборка и проверка:** `py -3.11 tools/planhaus/scripts/room_spatial.py rooms/kitchen-living.yaml --check`, затем
    `py -3.11 tools/room3d/build_room_3d.py rooms/kitchen-living.yaml -o viewer/kitchen-living.html`; открыть
-   `http://localhost:8765/kitchen-living.html` (`preview_start {name: "planner"}` — это `tools/room3d/serve.py`: он сам пересобирает HTML
+   `http://127.0.0.1:8765/kitchen-living.html` (через `start-planner.bat` запускается `tools/room3d/serve.py`, который пересобирает HTML
    и **сохраняет правки из вьюера прямо в YAML**, поэтому тестовые правки в нём меняют `rooms/*.yaml`; перед этим `localStorage.clear()`), посмотреть скриншот: модель на месте,
    лицом в комнату, нет ошибок в консоли.
 7. **Размер.** GLB целиком кодируется в HTML (+~1.35× размера файла). Модель на 200k треугольников = 5 МБ → HTML 8,6 МБ (был такой диван Waw, Максим его убрал): тяжелее одной-двух таких моделей
@@ -77,7 +77,7 @@
    Заменяя старый предмет: те же центры (position + width/2, gap + depth/2), старый `.glb` удалить из `assets/models/` и из `THIRD_PARTY.md`.
 10. Мебель с `.3ds` — точное место не знаем, не выдумывать: ставить у логичной стены, сказать Максиму и написать про пересечения с соседними предметами.
 
-## Установленные скиллы (`.claude/skills/`)
+## Установленные скиллы (`.agents/skills/`)
 
 | Скилл | Откуда | Зачем |
 |---|---|---|

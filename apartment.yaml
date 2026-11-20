@@ -4,6 +4,13 @@
 total_area_m2: 56.48
 living_area_m2: 23.20      # both bedrooms
 
+cabinet_materials:
+  bathroom-oak:
+    image: assets/textures/bathroom-oak.jpg  # from sources/wood.png, grain runs vertically
+    width: 100
+    height: 160
+    roughness: 0.55
+
 # -----------------------------------------------------------
 # LAYOUT
 # -----------------------------------------------------------
@@ -16,7 +23,7 @@ living_area_m2: 23.20      # both bedrooms
 # X = up, Y = left. The plan is not exactly to scale: it was fitted so the kitchen matches
 # Maxim's measurements (536.2 x 306.1 cm), the rest is read off the plan, about ±10-15 cm.
 # Plan areas vs the fitted outlines: corridor 9.66 / 9.91, bedroom 13.15 / 12.42,
-# bedroom 10.05 / 10.70, bathroom 4.01 / 4.66 (with the riser box), WC 1.45 / 1.29.
+# bedroom 10.05 / 10.70, WC 1.45 / 1.29. Bathroom measured separately: 287 x 156 cm before boxes (4.48 m²).
 #
 #   X ↑ (east)
 #        +-----------------------------+
@@ -197,88 +204,301 @@ rooms:
   - id: bathroom
     name: "Ванная"
     area_m2: 4.01
-    floor_color: "#c9c6c0"
-    floor: [[358.5, -149], [623, -149], [623, -325], [358.5, -325]]
+    # Textures sampled from Maxim's photos. Tile widths and band heights are estimated.
+    floor_tile: {image: assets/textures/bathroom-floor.jpg, width: 33, depth: 33}
+    wall_tile: {image: assets/textures/bathroom-wall.jpg, width: 40, height: 270}
+    floor: [[352, -149], [639, -149], [639, -305], [352, -305]]
     walls:
-      - [337, -134.5, 472, -149]              # wall to the corridor (door 472..539.5)
-      - [539.5, -134.5, 623, -149]
-      - [472, -134.5, 539.5, -149, 210, 270]  # lintel over the bathroom door
-      - [623, -61.5, 644.5, -360]             # wall to the stairwell
-      - [337, -325, 644.5, -360]              # wall to the neighbours
-      - [337, -147, 358.5, -325]              # wall to bedroom 10.05
-      - [523, -289, 566, -325]                # riser box
+      - [337, -134, 482, -149]                # wall to the corridor (door 482..549.5)
+      - [549.5, -134, 654, -149]
+      - [482, -134, 549.5, -149, 210, 270]    # lintel over the bathroom door
+      - [623, -60.5, 638, -134]               # stairwell wall at the end of the corridor
+      - [639, -149, 654, -320]                # wall to the stairwell along the bathroom
+      - [337, -305, 639, -320]                # wall to the neighbours
+      - [337, -149, 352, -305]                # wall to bedroom 10.05
     # corners of `floor` = A, B, C... in order; wall A-B runs from corner A to B; gap < 0 = behind the wall plane
-    # A=(358.5, -149)  B=(623, -149)  C=(623, -325)  D=(358.5, -325)
+    # A=(352, -149)  B=(639, -149)  C=(639, -305)  D=(352, -305)
     objects:
-      - id: bathroom-door
+      - id: bathroom-door-assembly
         label: "Дверь ванной"
+        type: group
+        follow_wall_cutaway: true
+      - id: bathroom-door
+        label: "Дверное полотно"
+        parent: bathroom-door-assembly
         wall: A-B
-        position: 115.5
+        position: 132
         gap: -9.5
         width: 63.5
         depth: 4
         height: 200
         color: "#4a3a30"
+      - id: bathroom-door-frame
+        label: "Дверная коробка с наличником (венге)"
+        type: group
+        parent: bathroom-door-assembly
+      - id: bathroom-door-jamb-start
+        label: "Стойка коробки со стороны зеркала"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 130
+        gap: -15
+        width: 2
+        depth: 15
+        height: 200
+        color: "#2e211c"
+      - id: bathroom-door-jamb-end
+        label: "Вторая стойка коробки"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 195.5
+        gap: -15
+        width: 2
+        depth: 15
+        height: 200
+        color: "#2e211c"
+      - id: bathroom-door-jamb-top
+        label: "Перекладина коробки"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 130
+        gap: -15
+        elevation: 200
+        width: 67.5
+        depth: 15
+        height: 10
+        color: "#2e211c"
+      - id: bathroom-door-trim-start
+        label: "Наличник со стороны зеркала"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 125
+        width: 7
+        depth: 1.5
+        height: 204
+        color: "#2e211c"
+      - id: bathroom-door-trim-end
+        label: "Второй боковой наличник"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 195.5
+        width: 7
+        depth: 1.5
+        height: 204
+        color: "#2e211c"
+      - id: bathroom-door-trim-top
+        label: "Верхний наличник"
+        parent: bathroom-door-frame
+        wall: A-B
+        position: 125
+        elevation: 204
+        width: 77.5
+        depth: 1.5
+        height: 11
+        color: "#2e211c"
       - id: bath
         label: "Ванна"
         wall: C-D
-        position: 104
-        gap: 4
-        width: 158
-        depth: 75
-        height: 58
+        position: 117
+        gap: 0
+        width: 170
+        depth: 70
+        height: 69
+        model: assets/models/ideal-standard-i-life-bath.glb
+        rotation: 180
+        elevation: 0
+        smooth_angle: 85
+      # The screen meets the underside of the model's rim, 93.6% of its fitted height.
+      - id: bath-screen-front
+        label: "Экран ванны — вдоль прохода"
+        wall: C-D
+        position: "=bath.position + 0.25"
+        gap: "=bath.gap + bath.depth - depth - 0.25"
+        width: "=bath.width - 0.25"
+        depth: 1.8
+        height: "=bath.height * 0.936"
         color: "#f4f4f2"
-      - id: washbasin
-        label: "Раковина"
+      - id: bath-screen-end
+        label: "Экран ванны — торец"
+        wall: C-D
+        position: "=bath-screen-front.position"
+        width: "=bath-screen-front.depth"
+        depth: "=bath-screen-front.gap"
+        height: "=bath-screen-front.height"
+        color: "#f4f4f2"
+      - id: bathroom-furniture
+        label: "Мебель ванной"
+        type: group
+        facade: "#a3a3a3"
+        carcass: "#ffffff"
+        worktop: "#fff7f0"
+      - id: washbasin-countertop
+        label: "Столешница под раковиной"
+        parent: bathroom-furniture
+        palette_role: worktop
         wall: D-A
-        position: 103
-        gap: 2.5
-        elevation: 65
-        width: 55
-        depth: 45
-        height: 20
-        color: "#f4f4f2"
+        position: 71.5
+        gap: 0
+        elevation: 76
+        width: 71
+        depth: 42
+        height: 3
+        finish: wood
+      - id: washbasin
+        label: "Раковина Duravit Luv"
+        wall: D-A
+        position: 80
+        gap: 10.5
+        elevation: "=washbasin-countertop.elevation + washbasin-countertop.height"
+        width: 50
+        depth: 25
+        height: 13.6
+        model: assets/models/duravit-luv-037960.glb
+        smooth_angle: 30
+      - id: bathroom-vanity
+        label: "Тумба под раковиной"
+        parent: bathroom-furniture
+        palette_role: carcass
+        wall: D-A
+        position: 74.5
+        gap: "=washbasin-countertop.gap"
+        elevation: 22
+        width: 64
+        depth: "=washbasin-countertop.depth - 4"
+        height: "=washbasin-countertop.elevation - elevation"
+        doors: 2
+        facade_layout: drawers
+        fluted_facade: true
+        variant: "bathroom-oak-white"
+        variants:
+          graphite:
+            label: "Графит"
+          bathroom-oak-white:
+            label: "Белый фасад · дерево"
+            facade: "#f6f5f2"
+            side_material: bathroom-oak
+      - id: bathroom-tall-cabinet
+        label: "Шкаф-пенал"
+        parent: bathroom-furniture
+        palette_role: carcass
+        wall: D-A
+        position: 135.5
+        width: 20
+        depth: 15
+        height: 70
+        elevation: 102.5
+        doors: 2
+        facade_layout: stacked
+        fluted_facade: true
+        variant: "bathroom-oak-white"
+        variants:
+          graphite:
+            label: "Графит"
+          oak-white:
+            label: "Дуб и белый"
+            carcass: "#ba895f"
+            facade: "#f1efea"
+            carcass_finish: wood
+            facade_border: 0.8
+          oak-graphite:
+            label: "Дуб и графит с выемкой"
+            carcass: "#a98963"
+            facade: "#27282b"
+            carcass_finish: wood
+            pull_cutout: 1.8
+          oak-graphite-straight:
+            label: "Дуб и графит с перемычкой"
+            carcass: "#ba895f"
+            facade: "#292829"
+            carcass_finish: wood
+            facade_border: 1
+            facade_gap: 2
+          bathroom-oak-white:
+            label: "Белый фасад · дерево"
+            facade: "#f6f5f2"
+            side_material: bathroom-oak
+        gap: 19
+        rotation: 0
+      - id: bathroom-mirror
+        label: "Зеркало над раковиной"
+        type: mirror
+        wall: D-A
+        position: 71.5
+        elevation: 102
+        width: 70
+        depth: 1
+        height: "=width"
       - id: bath-vent-box
         label: "Вентиляционный короб (решётка вверху)"
         wall: B-C
-        position: 66
-        width: 110
+        position: 73
+        width: 83
         depth: 57
         height: 270
         color: "#ece8e1"
-      - id: washer
-        label: "Стиральная машина LG 5 кг"
+        wall_tile: true
+        cutaway: [B-C, C-D]
+      - id: bath-riser-box
+        label: "Короб стояка"
         wall: B-C
-        position: 5
+        position: 115
+        gap: 57
+        width: 41
+        depth: 58
+        height: 270
+        color: "#f3f0ea"
+        cutaway: [B-C, C-D]
+      - id: washer
+        label: "Сушильная машина ASKO T5HP117LDLW"
+        wall: B-C
+        position: 8
         gap: 5
         width: 60
         depth: 44
         height: 85
-        color: "#e8e8e8"
+        model: assets/models/asko-t5hp117ldlw.glb
       - id: towel-rail
-        label: "Полотенцесушитель (оценка по фото)"
+        label: "Полотенцесушитель Alterna Ray S"
         wall: A-B
-        position: 221.5
-        elevation: 100
-        width: 30
-        depth: 12
-        height: 70
-        color: "#c8ccd0"
+        position: 228.5
+        elevation: 115.5
+        width: 48.9
+        depth: 11
+        height: 64.6
+        model: assets/models/alterna-ray-s-towel-warmer.glb
+        finish: chrome
+        smooth_angle: 180
+        gap: -2.5
       - id: bath-cabinet
-        label: "Шкаф над стиралкой 50×30×90"
+        label: "Шкаф над стиралкой"
         wall: B-C
-        position: 16
-        elevation: 140
-        width: 50
+        position: 11.5
+        elevation: 121
+        width: 60
         depth: 30
-        height: 90
-        color: "#f2efe9"
+        height: 100
+        color: "#f4f2ee"
+        facade: "#f4f2ee"
+        doors: 2
+        fluted_facade: true
+        open_niche: 17
+        variant: bathroom-oak-white
+        variants:
+          white-niche:
+            label: "Белый с открытой нишей"
+          bathroom-oak-white:
+            label: "Белый фасад · дерево"
+            facade: "#f6f5f2"
+            side_material: bathroom-oak
+            open_niche: 0
+            lower_pull: 2.2
+        gap: 0.5
       - id: bathroom-ceiling-light
         label: "Потолочный светильник ванной"
         type: light
         wall: A-B
-        position: 96
-        gap: 76
+        position: 102.5
+        gap: 54
         elevation: 265
         width: 24
         depth: 24
@@ -339,5 +559,10 @@ notes: |
     Not measured yet: the slot width at 140-230 cm and the towel rail's top and depth.
     Accepted by Maxim the same day: light matte front in the tile colour, chrome handle or push-to-open.
   2026-11-14: added a ceiling light to preview the bathroom in the evening. Fixture placement and output are estimates.
+  2026-11-14: bathroom interior measured at 287 x 156 cm. Kept the door and the wall shared with bedroom 10.05 as layout anchors.
+  2026-11-14: bathroom walls set to 15 cm, keeping the bedroom-side wall face and door opening in place.
+  2026-11-14: replaced the bath box with the supplied Ideal Standard i-Life 160x70 .3ds model, fitted to the existing 170 x 70 x 58 cm envelope.
+  2026-11-14: placed the supplied Duravit Luv 037960 bowl on a 3 cm countertop above a 46 cm vanity, aligned with the mirror.
+  2026-11-19: replaced the towel rail box with the supplied Alterna Ray S model, keeping its centre on wall A-B and matching the Hansgrohe chrome.
   TODO: measure the wardrobe (width x depth x height, where it starts from the kitchen wall), the hall unit,
     the ventilation box, the entrance door and the corridor width - the plan is only ±10-15 cm.

@@ -78,6 +78,12 @@
   .ehead { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
   .ehead > div { flex:1; min-width:0; } #etitle { font-weight:600; font-size:14px; }
   .stitle { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:12px 0 2px; }
+  #normals-dialog { width:min(360px, calc(100vw - 32px)); inset:auto 16px 16px auto; margin:0; padding:16px;
+    background:var(--sl-color-neutral-0); color:var(--sl-color-neutral-900); border:1px solid var(--sl-color-neutral-300); border-radius:8px; }
+  #normals-dialog::backdrop { background:transparent; }
+  #normals-dialog h2 { font-size:16px; margin:0 0 10px; }
+  #normals-angle { width:100%; }
+  #normals-dialog .frow { flex-wrap:wrap; }
   #fields .f { margin:7px 0; }
   #fields .top { display:flex; align-items:center; gap:4px; margin-bottom:1px; } #fields .top > span { flex:1; min-width:0; }
   #fields sl-input { width:98px; flex:none; }
@@ -206,6 +212,16 @@
 <sl-icon-button class="ptab" id="tab-panel" name="layout-sidebar" label="Показать панель" title="Показать панель настроек сцены" data-hide="panel"></sl-icon-button>
 <sl-icon-button class="ptab" id="tab-side" name="layout-sidebar-reverse" label="Показать панель" title="Показать панель объектов" data-hide="side"></sl-icon-button>
 <div id="mbar"><sl-button data-sheet="panel">Вид</sl-button><sl-button data-sheet="side">Помещения</sl-button></div>
+<dialog id="normals-dialog" aria-labelledby="normals-title">
+  <h2 id="normals-title">Сглаживание нормалей</h2>
+  <label for="normals-angle">Максимальный угол <output id="normals-angle-value" for="normals-angle"></output></label>
+  <input id="normals-angle" type="range" min="1" max="180" step="1">
+  <div class="frow">
+    <sl-button id="normals-reset" size="small">Исходные</sl-button>
+    <sl-button id="normals-cancel" size="small">Отмена</sl-button>
+    <sl-button id="normals-apply" size="small" variant="primary">Применить</sl-button>
+  </div>
+</dialog>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -218,6 +234,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 
 const R = __ROOM_DATA__;
@@ -258,10 +275,17 @@ const isGroup = it => it.type === 'group' || it.type === 'kitchen';       // a c
 // ONE main colour (`color`) is editable for a simple object: a plain box, a sofa / chair model, a portal, a slat wall. Not for composite
 // ones (table: legs + top, tv, radiator, rug, an object with doors) nor for kitchen cabinets (they follow the kitchen palette).
 // A `kitchen: panel` board has its own colour too (a stand-in for a wall); without one it takes the carcass colour.
-const hasColor = it => !it.kind && !isGroup(it) && (!it.kitchen || it.kitchen === 'panel') && !['table', 'tv', 'radiator', 'rug', ...LIGHT_TYPES].includes(it.type) && it.doors == null;
+const hasColor = it => !it.kind && !isGroup(it) && !it.palette_role && (!it.kitchen || it.kitchen === 'panel') && !['table', 'tv', 'mirror', 'radiator', 'rug', ...LIGHT_TYPES].includes(it.type) && it.doors == null;
 // the palette of every `kitchen:` cabinet = the room's `type: kitchen` object: fronts, carcass (sides, top, bottom), worktops
 const PAL = [['facade', 'Фасады'], ['carcass', 'Корпус'], ['worktop', 'Столешница']];
+const hasPalette = it => isGroup(it) && PAL.every(([key]) => it[key]);
+const variantOf = it => it.variants?.[it.variant] || {};
 const palOf = o => {
+  if (o.palette_role) {
+    for (let group = byId(o.parent); group; group = byId(group.parent)) {
+      if (hasPalette(group)) return group;
+    }
+  }
   const k = roomById(o.room).objects.find(x => x.type === 'kitchen');
   return { facade: '#e9e6df', carcass: '#d8cfc4', worktop: '#6b6259', ...Object.fromEntries(PAL.map(([c]) => [c, k?.[c]]).filter(([, v]) => v)) };
 };
@@ -296,8 +320,10 @@ const dark = matchMedia('(prefers-color-scheme: dark)').matches;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(dark ? 0x1c1d1f : 0xf4f1ec);
 // soft image-based light from a generic room: gives PBR materials something to reflect and fills the shadows
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const reflectionMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = reflectionMap;
 scene.environmentIntensity = .5;
+const chrome = { color: 0xdfe2e5, metalness: 1, roughness: .12 };
 const FOV0 = 45;                                               // default vertical field of view, deg (scene setting "Угол обзора")
 const persp = new THREE.PerspectiveCamera(FOV0, 1, 0.05, 200);   // near is adjusted to the zoom every frame
 // orthographic zoom never moves the camera, so a near plane in front of it would slice the room whenever the camera sits close
@@ -363,15 +389,26 @@ function aptWallGroups(r) {
     const kind = !walls.length ? 'Стекло' : full ? (ps.length > 1 ? 'Стена с проёмом' : 'Стена')
       : ps.some(p => p.glass) ? 'Остекление' : walls.every(p => p.z0 > 0) ? 'Перемычка' : 'Низкая стенка';
     const first = walls[0] || ps[0];
-    return { id: `${r.id}:${first.glass ? 'g' : 'w'}${first.k}`, label: `${kind} ${n + 1} · ${Math.round(Math.max(len(x), len(y)))} см`,
+    const ax = len(x) < len(y) ? 'x' : 'y';                    // thin axis: the wall's normal runs along it
+    const across = ax === 'x' ? x : y, along = ax === 'x' ? y : x;
+    const normalAxis = ax === 'x' ? 0 : 1, alongAxis = 1 - normalAxis;
+    // A structural wall can extend past the room's corners. For a complete room edge, label its clear inside length.
+    const edge = walls.length && r.edges.find(e => {
+      const normal = ax === 'x' ? e.nx : e.ny;
+      if (Math.abs(normal) !== 1 || e.a[normalAxis] !== across[normal > 0 ? 0 : 1]) return false;
+      const span = span2(e.a[alongAxis], e.b[alongAxis]);
+      return span[0] >= along[0] && span[1] <= along[1];
+    });
+    return { id: `${r.id}:${first.glass ? 'g' : 'w'}${first.k}`, label: `${kind} ${n + 1} · ${Math.round(edge ? edge.L : len(along))} см`,
       wallOf: r, color: walls.length ? '#f3f0ea' : '#9fd0ef', parts: ps, c: [(x[0] + x[1]) / 2, (y[0] + y[1]) / 2],
-      ax: len(x) < len(y) ? 'x' : 'y' };                     // thin axis: the wall's normal runs along it
+      ax, edge };
   });
 }
 R.apartment.forEach(r => { r.wallGroups = aptWallGroups(r); });
 const WALLS = [...R.walls.map(w => ({ id: 'w:' + w.id, label: 'Стена ' + w.id, w, wallOf: MAIN, color: '#f3f0ea' })), ...R.apartment.flatMap(r => r.wallGroups)];
 const wallRow = id => WALLS.find(x => x.id === id);
-const solid = new Set(ui.solid || (ui.cutaway === false ? WALLS.map(x => x.id) : []));   // ids of walls without cutaway (old global switch carried over)
+const hasCutaway = o => o.cutaway?.length > 0;
+const solid = new Set(ui.solid || (ui.cutaway === false ? [...WALLS, ...OBJECTS.filter(hasCutaway)].map(x => x.id) : []));
 let cutDeg = clamp(+(ui.cut ?? 63), 0, 90);        // scene setting: cutaway angle, see updateWalls
 let saveTimer;
 function saveUi() {                                // debounced: camera 'change' fires on every frame
@@ -402,10 +439,16 @@ const SHADOW_TYPES = ['sun', 'light', 'bulb'];
 const castsShadow = it => SHADOW_TYPES.includes(it.type) || isGroup(it) && OBJECTS.some(o => o.parent === it.id && SHADOW_TYPES.includes(o.type));
 const all = () => [...R.holes, ...OBJECTS];
 const byId = id => all().find(i => i.id === id);
+function followsWallCutaway(o) {
+  for (let it = o; it; it = it.parent && byId(it.parent)) {
+    if (it.follow_wall_cutaway) return true;
+  }
+  return false;
+}
 const underSel = o => { for (let x = o; x; x = x.parent && byId(x.parent)) if (x.id === sel) return true; return false; };   // the selected item or a container above it
-const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...(hasColor(it) ? ['color'] : []), ...(it.type === 'shelf' ? ['inner', 'led'] : []), ...(castsShadow(it) ? ['shadow'] : []), ...(hasFinish(it) ? ['finish'] : []), ...Object.keys(it.params || {})];
+const keysOf = it => it.kind ? KEYS.hole : [...KEYS.object, ...PAL.map(([c]) => c), ...(hasColor(it) ? ['color'] : []), ...(it.type === 'shelf' ? ['inner', 'led'] : []), ...(castsShadow(it) ? ['shadow'] : []), ...(hasFinish(it) ? ['finish'] : []), ...(it.model ? ['smooth_angle'] : []), ...(it.variants ? ['variant'] : []), ...Object.keys(it.params || {})];
 // what an object is made of, for the photoreal render (render_mode.js): any object with a body - not openings, containers, light sources
-function hasFinish(it) { return !it.kind && !isGroup(it) && !LIGHT_TYPES.includes(it.type); }
+function hasFinish(it) { return !it.kind && !isGroup(it) && it.type !== 'mirror' && !LIGHT_TYPES.includes(it.type); }
 const FINISHES = [['auto', 'как во вьюере / по типу'], ['fabric', 'ткань'], ['wood', 'дерево'], ['plastic', 'пластик'], ['paint', 'матовая краска'],
   ['satin', 'сатиновый лак'], ['gloss', 'глянцевый лак'], ['metal', 'металл'], ['chrome', 'хром'], ['stone', 'камень']];
 all().forEach(it => {
@@ -767,14 +810,25 @@ const ceiling = makeCeiling(floorShape); scene.add(ceiling);
 const T = R.thickness, H = R.ceiling;
 const wallMat = () => new THREE.MeshStandardMaterial({ color: 0xf3f0ea, roughness: .95 });
 const wallGroups = [], pickables = [], aptWalls = [];
+const cutawayObjects = new Map();                  // object ID -> group containing everything drawn for it
 const root = new THREE.Group(); scene.add(root);   // walls, openings, objects: rebuilt on every edit
+const chromePreviews = new Map();
+const chromeMeshes = new Map();
 function clearRoot() {
+  for (const [mesh, original] of chromeMeshes) mesh.material = original;
+  chromeMeshes.clear();
+  for (const material of chromePreviews.values()) material.dispose();
+  chromePreviews.clear();
   // CSS2DRenderer only drops the DOM label of an object removed directly from its parent, not of one inside a removed group
   root.traverse(o => { if (o.isCSS2DObject) o.element.remove(); });
-  reflectors.splice(0).forEach(m => m.dispose());                                   // TV mirrors: their render targets
-  root.traverse(o => { if (!o.userData.shared) { o.geometry?.dispose(); [o.material].flat().forEach(m => m?.dispose()); } });   // model meshes are reused
+  reflectors.splice(0).forEach(m => m.dispose());                                   // release the render targets
+  root.traverse(o => {
+    if (!o.userData.shared || o.userData.smoothed) o.geometry?.dispose();
+    if (!o.userData.shared) [o.material].flat().forEach(m => m?.dispose());
+  });
   root.traverse(o => { if (o.isLight) o.dispose(); });                                // spots' shadow maps
   root.clear(); wallGroups.length = 0; pickables.length = 0; aptWalls.length = 0; daylight.length = 0; lamps.length = 0;
+  cutawayObjects.clear();
 }
 
 // The selection is an overlay: the orange outline of the selected wall / opening / object (and its size label), drawn on top of
@@ -788,16 +842,17 @@ function applySelection() {
   });
   if (!sel) return;
   const it = byId(sel);
-  if (wallRow(sel) || it?.kind) {                      // a wall (several boxes with one id) or an opening (its invisible pick box)
-    pickables.filter(m => m.userData.id === sel).forEach(m => {
+  const outlineMeshes = id => {
+    pickables.filter(m => m.userData.id === id).forEach(m => {
       const l = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xff7a00, depthTest: false }));
       l.renderOrder = 10; m.add(l); selNodes.push(l);
     });
-    return;
-  }
+  };
+  if (wallRow(sel) || it?.kind) return outlineMeshes(sel);
   ROOMS.forEach(room => room.objects.forEach(o => {   // an object, or every object inside the selected container
     const w = edgeOf(o);
     if (!w || hid.has(o.id) || !underSel(o)) return;
+    if (cutawayObjects.has(o.id)) return outlineMeshes(o.id);    // the outline follows the visibility of its mesh
     const n0 = root.children.length;
     selectionBox(o, w); spin(o, w, n0);
     selNodes.push(...root.children.slice(n0));
@@ -896,6 +951,7 @@ function build() {
     if (o.type === 'shelf') return placeShelf(o, w, picked);
     if (o.type === 'table') return placeTable(o, w, picked);
     if (o.type === 'tv') return placeTv(o, w, picked);
+    if (o.type === 'mirror') return placeMirror(o, w);
     if (o.type === 'radiator') return placeRadiator(o, w, picked);
     if (o.type === 'rug') return placeRug(o, w, picked);
     if (o.type === 'light') return placeLight(o, w, picked);
@@ -974,11 +1030,51 @@ function build() {
       return m;
     };
     const pal = palOf(o);
+    const style = variantOf(o);
     if (o.gloss && !o.kitchen) {                       // a glossy plain box (hob): its top face is a mirror too
       const g = localFrame(o, w), m = glassMirror(o, w, g, new THREE.PlaneGeometry(o.width * S, o.depth * S), 1024, o.depth / o.width);
       m.rotation.x = -Math.PI / 2; m.position.set(0, (o.height + .08) * S, 0);
     }
-    const body = box(o.depth, o.elevation, o.height, o.kitchen === true ? pal.carcass : o.color || (o.kitchen && pal.carcass), .6, !!o.gloss);
+    const bodyColor = style.carcass ?? (o.palette_role ? pal[o.palette_role] : o.kitchen === true ? pal.carcass : o.color || (o.kitchen && pal.carcass));
+    const board = Math.min(1.6, o.width / 4, o.height / 6, o.depth / 4);
+    const openNiche = style.open_niche ?? o.open_niche;
+    const nicheHeight = openNiche ? Math.min(Math.max(openNiche, 2 * board), o.height - 3 * board) : 0;
+    const stacked = ['drawers', 'stacked'].includes(o.facade_layout);
+    const doorCount = Math.round(o.doors);
+    const lowerPull = !stacked && doorCount === 2 ? (style.lower_pull ?? 0) : 0;
+    const insetFront = nicheHeight || lowerPull;
+    const doorThickness = insetFront ? Math.min(1.8, o.depth / 2) : 1.8;
+    const front = w.nx * w.dy - w.ny * w.dx > 0 ? -1 : 1;
+    const sideMaterial = R.cabinet_materials?.[style.side_material];
+    let body;
+    if (nicheHeight) {
+      const { width, depth, height, elevation } = o;
+      const upperDepth = depth - (o.doors >= 1 ? doorThickness : 0);
+      const panel = (x0, x1, t0, t1, bottom, top) =>
+        pieces({ x0, x1, t0, t1, z0: elevation + bottom, z1: elevation + top }, bodyColor, .6);
+      panel(0, width, 0, board, 0, height);                             // back
+      panel(0, width, board, depth, 0, board);                          // bottom
+      panel(0, width, board, upperDepth, nicheHeight, nicheHeight + board);
+      panel(0, width, board, upperDepth, height - board, height);       // top
+      for (const [x, face] of [[0, 1], [width - board, 0]]) {
+        const lower = panel(x, x + board, board, depth, board, nicheHeight);
+        const upper = panel(x, x + board, board, upperDepth, nicheHeight + board, height - board);
+        if (sideMaterial) for (const mesh of [...lower, ...upper]) applyCabinetWood(mesh, sideMaterial, [face]);
+      }
+    } else {
+      body = box(lowerPull ? o.depth - doorThickness : o.depth, o.elevation, o.height, bodyColor, .6, !!o.gloss);
+    }
+    if (o.palette_role === 'worktop' && o.finish === 'wood' && body?.material) {
+      body.material.map = worktopGrain();
+    }
+    if (sideMaterial && body?.geometry?.type === 'BoxGeometry') {
+      applyCabinetWood(body, sideMaterial, lowerPull ? [0, 1, 3, front > 0 ? 4 : 5] : [0, 1]);
+    } else if (style.carcass_finish === 'wood' && body?.material) {
+      body.material.map = verticalWoodGrain();
+    }
+    if (o.wall_tile && room.wall_tile && body?.geometry?.type === 'BoxGeometry') {
+      applyBoxWallTiles(body, o, w, room.wall_tile);
+    }
     if (o.top) box(o.depth + 2, o.elevation + o.height, o.top, pal.worktop, .3);   // countertop, 2 cm front overhang
     if (o.kitchen === true) {                        // kitchen: panel = a plain board in the carcass colour, no front
       // front panel (1.8 cm), 2 mm smaller than the body all round, so a thin carcass edge shows, 1 mm proud of it.
@@ -999,16 +1095,33 @@ function build() {
       root.add(m); pickables.push(m);
       }
     }
-    if (o.doors >= 1 && !o.kitchen) {                // N equal doors over the front, 3 mm apart, 2 mm in from the body edges
-      const n = Math.round(o.doors), gp = .3, dw = (o.width - .4 - gp * (n - 1)) / n;
-      const mat = new THREE.MeshStandardMaterial({ color: o.facade || '#f2f0eb', roughness: .4 });
-      const line = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 });
+    if (o.doors >= 1 && !o.kitchen) {
+      const n = doorCount;
+      const frontHeight = o.height - nicheHeight;
+      const border = Math.min(style.facade_border ?? .2, (o.width - .01) / 2, (frontHeight - .01) / 2);
+      const innerWidth = o.width - 2 * border, innerHeight = frontHeight - 2 * border;
+      const span = stacked ? innerHeight : innerWidth;
+      const gap = Math.min(style.facade_gap ?? .3, span / (2 * n));
+      const segment = Math.max(.01, (span - gap * (n - 1)) / n);
+      const width = stacked ? innerWidth : segment, height = stacked ? segment : innerHeight;
+      const fluted = style.fluted_facade ?? o.fluted_facade;
+      const color = style.facade ?? (o.palette_role ? pal.facade : o.facade || '#f2f0eb');
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: fluted ? .75 : .4 });
+      const line = fluted ? null : new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 });
       for (let i = 0; i < n; i++) {
-        const g = new THREE.BoxGeometry(dw * S, (o.height - .4) * S, 1.8 * S), m = new THREE.Mesh(g, mat);
-        const u = o.position + .2 + dw / 2 + i * (dw + gp), t = o.gap + o.depth + .9;
-        m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, o.elevation + o.height / 2));
+        // For two stacked fronts, carve the top of the lower door and the bottom of the upper door.
+        const pull = stacked && n === 2 ? (style.pull_cutout ?? 0) * (i === 0 ? -1 : 1) : lowerPull;
+        const pullSide = lowerPull ? (i === 0 ? 1 : -1) : 0;
+        const g = fluted || pull ? profiledFacade(width, height, front, fluted, pull, pullSide).scale(1, 1, doorThickness / 1.8)
+                                : new THREE.BoxGeometry(width * S, height * S, doorThickness * S);
+        const m = new THREE.Mesh(g, mat);
+        const offset = border + segment / 2 + i * (segment + gap);
+        const u = o.position + (stacked ? o.width / 2 : offset);
+        const t = o.gap + o.depth + (insetFront ? -doorThickness / 2 : .9);
+        const z = o.elevation + nicheHeight + (stacked ? offset : frontHeight / 2);
+        m.position.copy(P(w.a[0] + w.dx * u - w.nx * t, w.a[1] + w.dy * u - w.ny * t, z));
         m.rotation.y = Math.atan2(w.dy, w.dx); m.castShadow = m.receiveShadow = true; m.userData.id = o.id;
-        m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), line));
+        if (line) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), line));
         root.add(m); pickables.push(m);
       }
     }
@@ -1018,11 +1131,104 @@ function build() {
     if (!w || hid.has(o.id)) return;
     const n0 = root.children.length;
     placeObject(room, o, w);
+    if (o.finish === 'chrome') {
+      for (const node of root.children.slice(n0)) node.traverse(applyChromePreview);
+    }
     spin(o, w, n0);
+    const followsWall = followsWallCutaway(o);
+    if (hasCutaway(o) || followsWall) {
+      const g = new THREE.Group();
+      g.userData.edges = (o.cutaway || []).map(id => room.edges.find(w => w.id === id));
+      if (followsWall) g.userData.wallEdge = w;
+      root.children.slice(n0).forEach(n => g.add(n));
+      root.add(g);
+      cutawayObjects.set(o.id, g);
+    }
   }));
   R.apartment.forEach(buildRoomShell);
   buildDaylight(); applyMode(); updateOcclusion();
   applySelection();
+}
+
+function applyChromePreview(mesh) {
+  if (!mesh.isMesh || mesh.isReflector) return;
+  const original = mesh.material;
+  const convert = material => {
+    if (!material?.isMeshStandardMaterial || material.transparent) return material;
+    if (!chromePreviews.has(material)) {
+      const preview = material.clone();
+      preview.setValues({ ...chrome, map: null, metalnessMap: null, roughnessMap: null, envMap: reflectionMap });
+      chromePreviews.set(material, preview);
+    }
+    return chromePreviews.get(material);
+  };
+  chromeMeshes.set(mesh, original);
+  mesh.material = Array.isArray(original) ? original.map(convert) : convert(original);
+}
+
+function profiledFacade(width, height, front, fluted, pull, pullSide) {
+  const left = -width / 2, right = width / 2, count = fluted || pull ? Math.max(2, Math.round(width / 2.7)) : 1;
+  const step = width / count, halfGroove = Math.min(.19, step / 4);
+  const outline = [[left, -.9], [right, -.9], [right, .9]];
+  for (let i = count - 1; i > 0; i--) {
+    const x = left + i * step;
+    if (fluted) outline.push([x + halfGroove, .9], [x + halfGroove / 2, .59], [x - halfGroove / 2, .59], [x - halfGroove, .9]);
+    else outline.push([x, .9]);
+  }
+  outline.push([left, .9]);
+  // Sample the back edge as well, so the opening goes through the door thickness.
+  if (pull) {
+    const back = outline.splice(0, 1);
+    for (let i = 1; i < count; i++) back.push([left + i * step, -.9]);
+    outline.unshift(...back);
+  }
+  const profile = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x * S, -front * z * S)));
+  const geometry = new THREE.ExtrudeGeometry(profile, { depth: height * S, bevelEnabled: false })
+    .rotateX(-Math.PI / 2).translate(0, -height * S / 2, 0);
+  if (pull) {
+    const edge = -Math.sign(pull) * height * S / 2;
+    const depth = Math.min(Math.abs(pull), height / 4) * S;
+    const vertices = geometry.attributes.position;
+    for (let i = 0; i < vertices.count; i++) {
+      if (Math.abs(vertices.getY(i) - edge) > 1e-6) continue;
+      const x = vertices.getX(i) / (width * S / 2);
+      const ramp = clamp((x * pullSide + .15) / .65, 0, 1);
+      const cut = pullSide ? ramp * ramp * (3 - 2 * ramp) : Math.max(0, 1 - x * x);
+      vertices.setY(i, edge + Math.sign(pull) * depth * cut);
+    }
+    geometry.computeVertexNormals();
+  }
+  return geometry;
+}
+
+let grainTexture;
+function worktopGrain() {
+  if (grainTexture) return grainTexture;
+  const canvas = Object.assign(document.createElement('canvas'), { width: 512, height: 256 });
+  const ctx = canvas.getContext('2d'), pixels = ctx.createImageData(canvas.width, canvas.height);
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const bend = 3 * Math.sin(x / 95 + y / 110) + 1.5 * Math.sin(x / 37);
+      const ring = Math.sin((y + bend) * .41 + 1.7 * Math.sin(y / 39));
+      const fine = Math.sin((y + bend) * 2.7);
+      const shade = 240 + 10 * ring ** 3 + 3 * fine;
+      const i = (y * canvas.width + x) * 4;
+      pixels.data.set([shade, shade, shade, 255], i);
+    }
+  }
+  ctx.putImageData(pixels, 0, 0);
+  grainTexture = new THREE.CanvasTexture(canvas);
+  grainTexture.colorSpace = THREE.SRGBColorSpace;
+  return grainTexture;
+}
+let cabinetGrain;
+function verticalWoodGrain() {
+  if (!cabinetGrain) {
+    cabinetGrain = worktopGrain().clone();
+    cabinetGrain.center.set(.5, .5);
+    cabinetGrain.rotation = Math.PI / 2;
+  }
+  return cabinetGrain;
 }
 
 // ---------- window: white PVC frame, mullion, fixed pane / opening sash, double glazing, sill with ears ----------
@@ -1117,23 +1323,112 @@ const planBox = (b, z0, z1, mat) => {
   m.userData.c = [(x0 + x1) / 2, (y0 + y1) / 2];
   return m;
 };
+const tileMaps = new Map();
+const tileLoader = new THREE.TextureLoader();
+const cabinetMaps = new Map();
+function applyCabinetWood(mesh, { image, width, height, roughness }, faces) {
+  if (!cabinetMaps.has(image)) {
+    const map = tileLoader.load(R.textures[image]);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    cabinetMaps.set(image, map);
+  }
+  const wood = new THREE.MeshStandardMaterial({ map: cabinetMaps.get(image), roughness });
+  mesh.material = Array.from({ length: 6 }, (_, face) => faces.includes(face) ? wood : mesh.material);
+  const { uv, normal } = mesh.geometry.attributes;
+  const size = mesh.geometry.parameters;
+  for (let i = 0; i < uv.count; i++) {
+    const nx = normal.getX(i), ny = normal.getY(i);
+    const face = nx ? (nx > 0 ? 0 : 1) : ny ? (ny > 0 ? 2 : 3) : normal.getZ(i) > 0 ? 4 : 5;
+    if (!faces.includes(face)) continue;
+    const u = Math.min(1, (nx ? size.depth : size.width) / (S * width));
+    const v = Math.min(1, (ny ? size.depth : size.height) / (S * height));
+    uv.setXY(i, .5 + (uv.getX(i) - .5) * u, .5 + (uv.getY(i) - .5) * v);
+  }
+}
+function tileMaterial({ image, width, depth, height }, roughness) {
+  const key = [image, width, depth, height].join('|');
+  if (!tileMaps.has(key)) {
+    const map = tileLoader.load(R.textures[image], undefined, undefined, e => console.error('tile ' + image, e));
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.wrapS = THREE.RepeatWrapping;
+    if (depth) map.wrapT = THREE.RepeatWrapping;
+    map.repeat.set(1 / (width * S), 1 / ((depth ?? height) * S));
+    map.anisotropy = 8;
+    tileMaps.set(key, map);
+  }
+  return new THREE.MeshStandardMaterial({ map: tileMaps.get(key), roughness });
+}
+function applyBoxWallTiles(mesh, object, wall, tile) {
+  const { position, normal, uv } = mesh.geometry.attributes;
+  const boxMaterial = mesh.material, tiles = tileMaterial(tile, .4);
+  // BoxGeometry material slots: +X, -X, +Y, -Y, +Z, -Z.
+  mesh.material = [tiles, tiles, boxMaterial, boxMaterial, tiles, tiles];
+  const front = wall.nx * wall.dy - wall.ny * wall.dx > 0 ? -1 : 1;
+  const along = distance => front > 0 ? distance : wall.L - distance;
+  for (let i = 0; i < position.count; i++) {
+    const nx = normal.getX(i), nz = normal.getZ(i);
+    if (!nx && !nz) continue;
+    const u = nx
+      ? along(object.position + (nx > 0 ? object.width : 0)) * S + nx * (front * object.depth * S / 2 - position.getZ(i))
+      : along(object.position + object.width / 2) * S + nz * position.getX(i);
+    const v = (object.elevation + (position.getY(i) > 0 ? object.height : 0)) * S;
+    uv.setXY(i, u, v);
+  }
+}
+function addWallTiles(wall, part, room, material) {
+  for (const edge of room.edges) {
+    const axis = edge.nx ? 0 : 1, along = 1 - axis;
+    const normal = [edge.nx, edge.ny][axis];
+    const across = axis === 0 ? part.x : part.y;
+    const span = along === 0 ? part.x : part.y;
+    if (Math.abs(normal) !== 1 || edge.a[axis] !== across[normal > 0 ? 0 : 1]) continue;
+    const start = Math.max(Math.min(edge.a[along], edge.b[along]), span[0]);
+    const end = Math.min(Math.max(edge.a[along], edge.b[along]), span[1]);
+    if (start >= end) continue;
+    const direction = [edge.dx, edge.dy][along];
+    const u0 = (start - edge.a[along]) * direction, u1 = (end - edge.a[along]) * direction;
+    // Offset the ceramic face 1 mm into the room to clear the structural wall.
+    const position = (u, z) => P(edge.a[0] + u * edge.dx - .1 * edge.nx, edge.a[1] + u * edge.dy - .1 * edge.ny, z)
+      .sub(wall.position).toArray();
+    const { z0, z1 } = part;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      ...position(u0, z0), ...position(u1, z0), ...position(u1, z1), ...position(u0, z1),
+    ], 3));
+    const rightward = edge.dx * edge.ny - edge.dy * edge.nx > 0;
+    geometry.setIndex((rightward ? direction : -direction) > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2]);
+    geometry.computeVertexNormals();
+    const uv = u => (rightward ? u : edge.L - u) * S;
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+      uv(u0), z0 * S, uv(u1), z0 * S, uv(u1), z1 * S, uv(u0), z1 * S,
+    ], 2));
+    const tiles = new THREE.Mesh(geometry, material);
+    tiles.receiveShadow = true;
+    wall.add(tiles);
+  }
+}
 function buildRoomShell(r) {
   if (!hid.has(shellId(r))) {
+    const floorMaterial = r.floor_tile ? tileMaterial(r.floor_tile, .34)
+      : new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 });
     const fl = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))),
-      new THREE.MeshStandardMaterial(r.floor_color ? { color: r.floor_color, roughness: .35 } : { map: plank, roughness: .5 }));
+      floorMaterial);
     fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; root.add(fl);
     // a lintel (a wall box that starts above the floor and reaches the ceiling) = a doorway: its floor gets this room's floor
     r.walls.filter(b => b.length > 4 && b[4] > 0 && b[5] >= R.ceiling).forEach(b =>
       root.add(thresholdPatch([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], fl.material)));
     const ce = makeCeiling(new THREE.Shape(r.floor.map(p => new THREE.Vector2(p[0] * S, p[1] * S)))); root.add(ce);
     const wm = wallMat();
+    const tiles = r.wall_tile && tileMaterial(r.wall_tile, .4);
     const gm = new THREE.MeshStandardMaterial({ color: 0x9fd0ef, transparent: true, opacity: .35, roughness: .1 });
     // one wall = several boxes with one id and one centre: selected, outlined and cut away together
     r.wallGroups.forEach(g => g.parts.forEach(p => {
       const m = planBox(p.b, p.z0, p.z1, p.glass ? gm : wm);
-      Object.assign(m.userData, { id: g.id, c: g.c, ax: g.ax }); root.add(m); aptWalls.push(m); pickables.push(m);
+      Object.assign(m.userData, { id: g.id, c: g.c, ax: g.ax, edge: g.edge }); root.add(m); aptWalls.push(m); pickables.push(m);
       if (!p.glass) {
         m.receiveShadow = true;
+        if (tiles) addWallTiles(m, p, r, tiles);
         m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: .12 })));
       }
     }));
@@ -1145,6 +1440,7 @@ function buildRoomShell(r) {
 // The model's bounding box is fitted into the object's box (width along the wall, height, depth from the wall);
 // the model's front (+Z in glTF) faces the room and its +X runs to the right of someone facing the wall.
 const models = {};                                   // path -> { scene, size, center } once loaded
+let normalsPreview = null;
 const gltfLoader = new GLTFLoader();
 Object.entries(R.models).forEach(([path, uri]) => gltfLoader.load(uri, g => {
   const s = g.scene;
@@ -1194,7 +1490,15 @@ function placeModel(o, w, picked) {
   if (o.def?.color && M.dom && o.def.color.toLowerCase() !== M.base) inner.traverse(m => { if (m.isMesh) m.material = tintMaterial(M, m.material, o.def.color); });
   if (o.gloss) inner.traverse(m => { if (m.isMesh) m.material = glossMaterial(m.material); });
   inner.position.copy(M.center).negate();
-  inner.traverse(m => { if (m.isMesh) { m.userData.id = o.id; pickables.push(m); } });
+  const angle = normalsPreview?.id === o.id ? normalsPreview.angle : o.smooth_angle;
+  inner.traverse(m => {
+    if (!m.isMesh) return;
+    if (angle >= 1 && angle <= 180) {
+      m.geometry = smoothGeometry(m.geometry, angle, M.size);
+      m.userData.smoothed = true;
+    }
+    m.userData.id = o.id; pickables.push(m);
+  });
   const fit = new THREE.Group();
   fit.scale.set(o.width * S / M.size.x, o.height * S / M.size.y, o.depth * S / M.size.z);
   fit.add(inner);
@@ -1212,6 +1516,24 @@ function placeModel(o, w, picked) {
     mm.position.set(0, (m.bottom + m.height / 2) * S, (o.depth / 2 - (m.back ?? 0) + .12) * S);
   }
   if (picked) selectionBox(o, w);
+}
+
+function smoothGeometry(source, angle, size) {
+  const geometry = source.index ? source.toNonIndexed() : source.clone();
+  const original = geometry.attributes.position;
+  // The utility hashes positions in fixed-size cells. Work at a common scale so small details don't merge by model units.
+  const scale = 100 / Math.max(size.x, size.y, size.z);
+  const positions = new Float32Array(original.count * 3);
+  for (let i = 0; i < original.count; i++) {
+    positions[3 * i] = original.getX(i) * scale;
+    positions[3 * i + 1] = original.getY(i) * scale;
+    positions[3 * i + 2] = original.getZ(i) * scale;
+  }
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  toCreasedNormals(geometry, THREE.MathUtils.degToRad(angle));
+  geometry.setAttribute('position', original);
+  geometry.deleteAttribute('tangent');                            // normal maps can derive tangents from the updated normals and UVs
+  return geometry;
 }
 
 // orange outline of the object's box and its size label (for objects drawn as several meshes)
@@ -1365,18 +1687,21 @@ function lbox(g, o, sx, sy, sz, x, y, z, mat, edges = 0) {           // a box sx
 // with the orthographic camera the screen is plain dark glass, no reflection.
 const reflectors = [];
 const SCREEN_TINT = .12;                                               // share of the room the screen returns (linear): dark glass
+const screenColor = new THREE.Color().setRGB(SCREEN_TINT, SCREEN_TINT, SCREEN_TINT * 1.05);
 const SCREEN_SHADER = {
   name: 'ScreenGlass',
-  uniforms: Reflector.ReflectorShader.uniforms,
+  uniforms: { ...Reflector.ReflectorShader.uniforms, flatMirror: { value: false } },
   vertexShader: Reflector.ReflectorShader.vertexShader,
   fragmentShader: `
     uniform vec3 color;
     uniform sampler2D tDiffuse;
+    uniform bool flatMirror;
     varying vec4 vUv;
     #include <logdepthbuf_pars_fragment>
     void main() {
       #include <logdepthbuf_fragment>
-      gl_FragColor = vec4( texture2DProj( tDiffuse, vUv ).rgb * color, 1.0 );
+      vec3 reflection = flatMirror ? vec3(0.55) : texture2DProj( tDiffuse, vUv ).rgb;
+      gl_FragColor = vec4( reflection * color, 1.0 );
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }`,
@@ -1385,15 +1710,16 @@ const SCREEN_SHADER = {
 // render target (a small hob does not need the TV's full-screen one). The wall the object stands on is hidden in the reflection
 // (it lies between the reflected camera and the room).
 let mirrorBusy = false;                                                // one reflection at a time: a mirror seen in another one shows its last frame
-function glassMirror(o, w, frame, geo, px, h2w) {
+function glassMirror(o, w, frame, geo, px, h2w, color = screenColor) {
   const mirror = new Reflector(geo, {
-    shader: SCREEN_SHADER, color: new THREE.Color().setRGB(SCREEN_TINT, SCREEN_TINT, SCREEN_TINT * 1.05),
+    shader: SCREEN_SHADER, color,
     textureWidth: px, textureHeight: Math.max(64, Math.round(px * h2w)),
   });
   const reflect = mirror.onBeforeRender;
   let blank = false;                                                   // the target holds no stale reflection (orthographic camera)
   mirror.onBeforeRender = (r, sc, cam) => {
     if (sc.overrideMaterial || mirrorBusy) return;                     // not again for the AO depth / normal passes, nor inside another mirror
+    mirror.material.uniforms.flatMirror.value = cam.isOrthographicCamera && o.type === 'mirror';
     if (cam.isOrthographicCamera) {
       if (!blank) { const was = r.getRenderTarget(); r.setRenderTarget(mirror.getRenderTarget()); r.clear(); r.setRenderTarget(was); blank = true; }
       return;
@@ -1407,6 +1733,21 @@ function glassMirror(o, w, frame, geo, px, h2w) {
   mirror.userData.id = o.id;
   frame.add(mirror); pickables.push(mirror); reflectors.push(mirror);
   return mirror;
+}
+function placeMirror(o, w) {
+  const frame = localFrame(o, w), aspect = o.height / o.width;
+  const radius = o.width * S / 2, thickness = o.depth * S;
+  const backingGeo = new THREE.CylinderGeometry(radius, radius, thickness * .98, 64);
+  backingGeo.rotateX(Math.PI / 2).scale(1, aspect, 1);
+  const backing = new THREE.Mesh(backingGeo, new THREE.MeshStandardMaterial({ color: 0xbec3c6, metalness: .7, roughness: .2 }));
+  backing.position.y = o.height * S / 2;
+  backing.userData.id = o.id;
+  frame.add(backing); pickables.push(backing);
+
+  const face = new THREE.CircleGeometry(radius, 64).scale(1, aspect, 1);
+  const mirror = glassMirror(o, w, frame, face, 1024, aspect, new THREE.Color().setScalar(.9));
+  mirror.position.set(0, backing.position.y, thickness / 2);
+  mirror.userData.wallMirror = true;
 }
 function placeTv(o, w, picked) {
   const g = localFrame(o, w);
@@ -1571,10 +1912,20 @@ function placeLight(o, w, picked) {
   const spot = new THREE.SpotLight(0xffffff, 1, 0, Math.min(half * 1.4, Math.PI / 2 * .97), .6, 2);
   spot.intensity = (o.lumens ?? 600) / (2 * Math.PI * (1 - Math.cos(half))) * LUX;           // candela: lumens over the beam's solid angle
   spot.position.set(0, -1.5 * S, 0); spot.target.position.set(0, -1, 0);
-  // normalBias must stay well under the thinnest board (1.8 cm shelf, side panel): a 2 cm one let the light leak through the joints
   if (o.shadow !== false && lamps.filter(l => l.castShadow).length < LAMP_SHADOWS) {
-    spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024);
-    spot.shadow.bias = -.0002; spot.shadow.normalBias = .004; spot.shadow.camera.near = .03; spot.shadow.camera.far = 8;
+    // Very wide cones spread each shadow texel over more of the room. A finer map and more normal offset
+    // prevent depth comparison bands on flat surfaces lit at a grazing angle.
+    const wide = spot.angle >= THREE.MathUtils.degToRad(75);
+    const size = wide ? 4096 : 1024;
+    const shadow = spot.shadow;
+    spot.castShadow = true;
+    shadow.mapSize.set(size, size);
+    shadow.radius = wide ? 2 : 1;
+    shadow.bias = wide ? -.00035 : -.0002;
+    // The narrower kitchen spots need a smaller offset to keep light from leaking through 1.8 cm boards.
+    shadow.normalBias = wide ? .017 : .004;
+    shadow.camera.near = wide ? .05 : .03;
+    shadow.camera.far = wide ? Math.max(4, H * S + 1) : 8;
   }
   spot.userData = { kelvin: o.kelvin ?? 3000, lens: lensMat, flux: o.lumens ?? 600 };
   g.add(spot, spot.target); lamps.push(spot);
@@ -1717,6 +2068,8 @@ function applyMode() {
   // the eye adapts to the room's general level (indirect light, at least a little), not fully
   const exposure = clamp(Math.pow(E_REF / Math.max(Eind, 8), ADAPT), .05, 6);
   renderer.toneMappingExposure = exposure;
+  // Keep a soft reflection visible on polished chrome even when the evening fill is low.
+  for (const material of chromePreviews.values()) material.envMapIntensity = .45 / exposure;
   scene.background.set(m.bg[dark ? 1 : 0]);
   lightInfo = { flux, Eind, exposure };
   document.querySelectorAll('[data-light]').forEach(b => setOn(b, b.dataset.light === lightMode));
@@ -1729,7 +2082,7 @@ function applyMode() {
 const shadowRT = new THREE.WebGLRenderTarget(1, 1);
 function updateShadows() {
   shadowDirty = false;
-  const back = wallGroups.filter(g => !g.visible);
+  const back = [...wallGroups, ...cutawayObjects.values()].filter(g => !g.visible);
   back.forEach(g => { g.visible = true; });
   mirrorBusy = true;                                                   // no mirror reflections for this pass
   renderer.shadowMap.needsUpdate = true;
@@ -1826,20 +2179,37 @@ const camDir = new THREE.Vector3();
 function updateWalls() {
   const CUT = Math.cos(cutDeg * Math.PI / 180);
   camDir.subVectors(camera.position, controls.target).normalize();
+  const facesCamera = w => w.nx * camDir.x - w.ny * camDir.z > CUT;
+  const hiddenEdges = new Set();
   wallGroups.forEach(g => {
     const { w, wid, labels } = g.userData;
     // a wall between the camera and the room disappears with its window/door and labels; outward normal in three coords: (nx, 0, -ny).
     // The CUT margin (below) keeps side-on walls (e.g. in the top view) in place.
-    g.visible = !(!solid.has(wid) && w.nx * camDir.x - w.ny * camDir.z > CUT);
+    g.visible = solid.has(wid) || !facesCamera(w);
+    if (!g.visible) hiddenEdges.add(w);
     labels.forEach(l => { l.visible = g.visible; });
   });
-  // apartment walls, same rule as the kitchen's: a wall is cut away while the camera sees it from outside, i.e. it stands
-  // between the orbit target and the camera (across its thin axis) and the camera is not side-on to it (same CUT margin)
+  // For walls on the room outline, use the actual outside face. The orbit target can move beyond the far wall.
+  const cx = camera.position.x / S, cy = -camera.position.z / S;
   const dx = camDir.x, dy = -camDir.z;                         // camera direction in plan coords
   const tx = controls.target.x / S, ty = -controls.target.z / S;
   aptWalls.forEach(m => {
-    const { id, c, ax } = m.userData, d = ax === 'x' ? dx : dy, off = ax === 'x' ? c[0] - tx : c[1] - ty;
-    m.visible = solid.has(id) || !(Math.abs(d) > CUT && off * d > 0);
+    const { id, c, ax, edge } = m.userData;
+    if (edge) {
+      const outside = (cx - edge.a[0]) * edge.nx + (cy - edge.a[1]) * edge.ny > 0;
+      m.visible = solid.has(id) || !(outside && facesCamera(edge));
+      if (!m.visible) hiddenEdges.add(edge);
+    } else {
+      // Standalone wall blocks have no room-facing edge. Cut them only between the camera and target.
+      const axis = ax === 'x' ? 0 : 1;
+      const direction = axis === 0 ? dx : dy;
+      const cameraOffset = (axis === 0 ? cx : cy) - c[axis];
+      const targetOffset = c[axis] - (axis === 0 ? tx : ty);
+      m.visible = solid.has(id) || !(Math.abs(direction) > CUT && cameraOffset * direction > 0 && targetOffset * direction > 0);
+    }
+  });
+  cutawayObjects.forEach((g, id) => {
+    g.visible = !hiddenEdges.has(g.userData.wallEdge) && (solid.has(id) || !g.userData.edges.some(facesCamera));
   });
 }
 
@@ -1873,6 +2243,7 @@ btn('bapt').addEventListener('sl-change', e => {
 const swatch = it => {
   const p = it.room && !it.kind ? palOf(it) : {};
   return (it.type === 'sun' ? '#ffc94d' : it.type === 'sky' ? '#9fd0ef' : it.type === 'bounce' ? '#e8dccb' : LIGHT_TYPES.includes(it.type) ? '#ffd98a' : it.type === 'kitchen' ? it.facade : it.kitchen === 'panel' ? it.color || p.carcass : it.type === 'table' && it.kitchen ? p.worktop : it.kitchen && p.facade)
+    || variantOf(it).carcass || (it.palette_role && p[it.palette_role]) || (hasPalette(it) && it.facade)
     || it.color || models[it.model]?.base || (it.kind === 'window' ? '#9fd0ef' : '#c9b8a6');
 };
 let inputs = {}, cinputs = {};
@@ -1937,8 +2308,8 @@ function buildTree() {
   const row = (it, fixed, parent, room) => {
     const t = el('sl-tree-item'), sw = el('i', 'sw'), r = { t, sw, it, room };
     t.dataset.id = it.id; t.append(sw, el('span', 'nm', it.label));
-    if (wallRow(it.id)) { r.cut = tbtn(() => setSolid([it.id], !solid.has(it.id))); t.append(r.cut); }
-    else if (!fixed) { r.eye = tbtn(() => setHidden([it.id], !hid.has(it.id))); t.append(r.eye); }
+    if (wallRow(it.id) || hasCutaway(it)) { r.cut = tbtn(() => setSolid([it.id], !solid.has(it.id))); t.append(r.cut); }
+    if (!wallRow(it.id) && !fixed) { r.eye = tbtn(() => setHidden([it.id], !hid.has(it.id))); t.append(r.eye); }
     parent.append(t); rowOf.set(it.id, r);
   };
   if (sceneLights.length) {
@@ -2039,7 +2410,7 @@ const sections = it => it.kind ? [
   ['Размер', it.type === 'slats' ? [['width', 'Длина перегородки'], ['depth', 'Толщина рейки'], ['height', 'Высота']]
     : [['width', 'Ширина'], ['depth', 'Глубина'], ['height', 'Высота'], ...(it.top != null ? [['top', 'Столешница']] : [])]],
   ...(it.type === 'table' ? [['Ножки', [['leg', 'Сечение ножки']]]] : []),
-  ...(it.doors != null ? [['Фасады', [['doors', 'Дверец']]]] : []),
+  ...(it.doors != null ? [['Фасады', [['doors', it.facade_layout === 'drawers' ? 'Ящиков' : 'Дверец']]]] : []),
   ...(it.type === 'tv' ? [['Телевизор', [['panel', 'Толщина панели'], ['stand', 'Высота подставки под панелью']]]] : []),
   ...(it.type === 'slats' ? [['Рейки', [['rails', 'Количество'], ['rail_width', 'Ширина рейки']]]] : []),
   ...(it.type === 'shelf' ? [['Полки', [['shelves', 'Количество полок'], ['board', 'Толщина щита'], ['plinth', 'Цоколь']]],
@@ -2075,6 +2446,33 @@ function renderEditor() {
   btn('esub').textContent = sceneLights.includes(it) ? 'Освещение сцены'
     : `${roomById(it.room).name} · ${it.wall ? 'стена ' + it.wall : ENV.includes(it.type) ? 'источник света' : 'группа'}`;
   inputs = {}; cinputs = {}; btn('fields').replaceChildren();
+  if (it.variants) {
+    const select = el('sl-select');
+    select.size = 'small';
+    select.setAttribute('label', 'Вариант мебели');
+    select.hoist = true;
+    for (const [id, style] of Object.entries(it.variants)) {
+      const option = el('sl-option', '', style.label || id);
+      option.setAttribute('value', id);
+      select.append(option);
+    }
+    select.setAttribute('value', it.variant);
+    select.addEventListener('sl-change', () => {
+      if (select.value === it.variant || !Object.hasOwn(it.variants, select.value)) return;
+      record();
+      it.def.variant = it.variant = select.value;
+      saveEdits(); build(); renderTree();
+      btn('esw').style.background = swatch(it);
+      refresh();
+    });
+    btn('fields').append(select);
+  }
+  if (models[it.model]) {
+    const normals = el('sl-button', '', 'Сглаживание нормалей…');
+    normals.size = 'small';
+    normals.onclick = () => openNormals(it);
+    btn('fields').append(normals);
+  }
   const picker = (value, title, onInput) => {                         // a colour: Shoelace sl-color-picker, live while dragging
     const p = el('sl-color-picker'); p.size = 'small'; p.format = 'hex'; p.noFormatToggle = true; p.hoist = true; p.title = title; p.value = value;
     p.addEventListener('sl-input', () => { if (p.value) onInput(p.value); });
@@ -2130,29 +2528,60 @@ function renderEditor() {
       btn('fields').append(l2);
     }
   }
-  if (it.type === 'kitchen') {                                        // the palette of every `kitchen:` cabinet of the room
+  if (hasPalette(it)) {
     const g = el('div', 'kcol');
     PAL.forEach(([k, label]) => {
       const inp = picker(it[k], label, v => { record(it.id + '.' + k); it.def[k] = it[k] = v; saveEdits(); build(); renderTree(); refresh(); });
       cinputs[k] = inp;
       const l = el('label'); l.append(inp, el('span', '', label)); g.append(l);
     });
-    btn('fields').append(el('div', 'stitle', 'Цвета кухни'), g);
+    btn('fields').append(el('div', 'stitle', it.type === 'kitchen' ? 'Цвета кухни' : 'Цвета комплекта'), g);
   }
   if (hasFinish(it)) {                                                // the material of the photoreal render (`finish:`)
     const s = Object.assign(document.createElement('sl-select'), { size: 'small', hoist: true });
     s.innerHTML = FINISHES.map(([v, t]) => `<sl-option value="${v}">${t}</sl-option>`).join('');
     s.setAttribute('value', it.def.finish || 'auto');
-    s.title = 'Из чего сделан предмет — только для фотореалистичного рендера: ткань с мягким отливом, дерево с волокнами, пластик, лак, металл…';
+    s.title = 'Отделка для фотореалистичного рендера. Хром отображается и в 3D-вьюере.';
     s.addEventListener('sl-change', () => {
       record(it.id + '.finish');
       if (s.value === 'auto') { delete it.def.finish; it.finish = null; } else it.def.finish = it.finish = s.value;
       saveEdits(); build(); refresh();
     });
-    btn('fields').append(el('div', 'stitle', 'Материал (для рендера)'), s);
+    btn('fields').append(el('div', 'stitle', 'Материал'), s);
   }
   refresh();
 }
+
+const normalsDialog = btn('normals-dialog'), normalsAngle = btn('normals-angle');
+function openNormals(it) {
+  normalsAngle.value = it.smooth_angle ?? 30;
+  normalsDialog.showModal();
+  previewNormals(it.id);
+}
+function previewNormals(id) {
+  const angle = normalsAngle.valueAsNumber;
+  btn('normals-angle-value').textContent = `${angle}°`;
+  normalsPreview = { id, angle };
+  build();
+}
+function closeNormals(apply, angle) {
+  const it = byId(normalsPreview.id);
+  normalsPreview = null;
+  if (apply && angle !== it.smooth_angle) {
+    record();
+    if (angle === undefined) delete it.def.smooth_angle;
+    else it.def.smooth_angle = angle;
+    resolveAll(); saveEdits();
+  }
+  normalsDialog.close();
+  build(); refresh();
+}
+normalsAngle.addEventListener('input', () => { btn('normals-angle-value').textContent = `${normalsAngle.value}°`; });
+normalsAngle.addEventListener('change', () => previewNormals(normalsPreview.id));
+btn('normals-cancel').onclick = () => closeNormals(false);
+btn('normals-reset').onclick = () => closeNormals(true);
+btn('normals-apply').onclick = () => closeNormals(true, normalsAngle.valueAsNumber);
+normalsDialog.addEventListener('cancel', e => { e.preventDefault(); closeNormals(false); });
 
 // keep fields, hint and YAML in sync with the data (except the field being typed in)
 function refresh() {
@@ -2244,8 +2673,11 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
   const r = renderer.domElement.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
-  // the raycaster ignores `visible`, so skip cut-away walls and the openings of a hidden wall by hand
-  const id = ray.intersectObjects(pickables.filter(o => o.visible && o.parent.visible), false)[0]?.object.userData.id ?? null;
+  // The raycaster ignores visibility, including that of a cutaway group further up the hierarchy.
+  const id = ray.intersectObjects(pickables.filter(o => {
+    for (let n = o; n && n !== root; n = n.parent) if (!n.visible) return false;
+    return true;
+  }), false)[0]?.object.userData.id ?? null;
   const again = id !== null && id === sel;                     // another click on the selected item
   select(id);
   if (id !== null && byId(id)) {                               // (not a wall: it has no gizmo)
@@ -2311,6 +2743,7 @@ function revealSel() {
   setTimeout(() => row.t.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
 }
 addEventListener('keydown', e => {
+  if (normalsDialog.open) return;
   if (e.key === 'Escape') return select(null);
   if (!(e.ctrlKey || e.metaKey) || (e.code !== 'KeyZ' && e.code !== 'KeyY')) return;   // e.code: works on any keyboard layout
   e.preventDefault();                                                                  // instead of the browser's own text undo
@@ -2322,7 +2755,7 @@ const held = new Set();
 let speed = clamp(+ui.speed || 1, .05, 20), speedTimer;                         // m/s
 const typing = () => document.activeElement?.matches('input, textarea, select, sl-input, sl-range, sl-color-picker');
 addEventListener('keydown', e => {
-  if (e.ctrlKey || e.metaKey || e.altKey || typing()) return;
+  if (normalsDialog.open || e.ctrlKey || e.metaKey || e.altKey || typing()) return;
   if (FLY[e.code]) { held.add(e.code); e.preventDefault(); return; }
   const k = { Minus: 1 / 1.5, NumpadSubtract: 1 / 1.5, Equal: 1.5, NumpadAdd: 1.5 }[e.code];
   if (!k) return;
@@ -2383,13 +2816,14 @@ function tick() {
   const near = clamp(camera.position.distanceTo(controls.target) / 20, .001, .05);
   if (!isOrtho && Math.abs(persp.near - near) > 1e-5) { persp.near = near; persp.updateProjectionMatrix(); }
   if (ao) { renderPass.camera = gtao.camera = camera; composer.render(); } else renderer.render(scene, camera);
-  if (tc.object) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(gizmoScene, camera); renderer.autoClear = true; }   // gizmo on top
+  tc.enabled = cutawayObjects.get(sel)?.visible !== false;
+  if (tc.object && tc.enabled) { renderer.autoClear = false; renderer.clearDepth(); renderer.render(gizmoScene, camera); renderer.autoClear = true; }   // gizmo on top
   labelRenderer.render(scene, camera);
 }
 renderer.setAnimationLoop(tick);
 window.__viewer = { get camera() { return camera; }, controls, scene, renderer, lamps, sun, OCC,   // for debugging / tests from the console
   // ... and for the photoreal render mode (render_mode.js, inlined below by build_room_3d.py)
-  hooks: viewerHooks(), tick, wallGroups, daylight, hemi, MODES, envOf, R, H, S, LUX, GLASS, lightColor, ceilMat, labelRenderer,
+  hooks: viewerHooks(), tick, wallGroups, daylight, hemi, MODES, envOf, R, H, S, LUX, GLASS, lightColor, ceilMat, labelRenderer, chrome,
   updateWalls, get mode() { return lightMode; }, get info() { return lightInfo; }, apply: () => applyMode() };
 window.__ready = true;</script>
 <!--__RENDER_MODE__-->

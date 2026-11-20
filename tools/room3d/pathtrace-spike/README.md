@@ -14,7 +14,7 @@ py -3.11 tools/room3d/pathtrace-spike/make_test_page.py
 (three-gpu-pathtracer 0.0.28 `WebGPUPathTracer` + денойзер OIDN `oidn-webgpu` 0.6.0, веса `rt_hdr_alb_nrm.tza` с jsDelivr).
 Браузерная панель должна быть видна (скрытая останавливает requestAnimationFrame).
 
-## Результат (RTX 4080, Chrome 152 в Claude, WebGPU)
+## Результат (RTX 4080, Chrome 152, WebGPU)
 
 - Работает: та же сцена three.js, без копии; BVH сцены строится за 50–225 мс.
 - Скорость при 1024 × 768, 8 отражений: ~25–45 сэмплов/с; 256 сэмплов ≈ 7–10 с; OIDN ≈ 0,1 с.

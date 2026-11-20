@@ -1,6 +1,6 @@
 # planhaus 1.0 — Architecture
 
-planhaus is a Claude Desktop / Claude Code native plugin that makes the agent reason like a
+planhaus is a host-integrated plugin that makes the agent reason like a
 professional interior designer. Version 1.0 restructures the plugin around the professional
 design process (programming → concept → zoning → circulation → layout → FF&E selection →
 lighting → review) instead of jumping straight to furniture placement.
@@ -28,7 +28,7 @@ checks live in the rules engine.
 
 ```
 planhaus/
-├── .claude-plugin/plugin.json     # v1.0.0 manifest + userConfig (catalog_db_path)
+├── plugin manifest     # v1.0.0 manifest + userConfig (catalog_db_path)
 ├── .mcp.json                      # planhaus-catalog MCP server (host-side)
 ├── hooks/
 │   ├── hooks.json                 # documented nested schema; SessionStart + PostToolUse
@@ -78,7 +78,7 @@ planhaus/
   `mcp__planhaus-catalog__catalog_get` for catalog skills
 - `disable-model-invocation: true` on `new-project` and `setup` (user-triggered only)
 - `review` uses `context: fork` + `agent: planhaus:design-reviewer`
-- Reference scripts via `${CLAUDE_PLUGIN_ROOT}` (quoted in shell commands: `"${CLAUDE_PLUGIN_ROOT}"`)
+- Reference scripts via `${PLANHAUS_ROOT}` (quoted in shell commands: `"${PLANHAUS_ROOT}"`)
 
 ## Subagents (`agents/*.md`)
 
@@ -197,7 +197,7 @@ colors` (JSON string) and `full_product` (JSON string, kept).
 - New `catalog_get(ids: list[str])`: returns full product data for shortlisted ids (so the
   curator judges from rich data without re-querying).
 - `catalog_stats`: add price ranges + category/color facets.
-- `_ensure_deps` stays (Cowork hook execution context is unverified) but must fail fast with a
+- `_ensure_deps` stays (the plugin host hook execution context is unverified) but must fail fast with a
   clear JSON error if pip fails, not hang.
 
 ## Selection rubric (encoded in `select` skill + `furniture-curator` agent)
@@ -306,7 +306,7 @@ dominant|secondary|accent`, `visual_weight: light|medium|heavy`, `mass:` (kg), `
     "PostToolUse": [
       { "matcher": "Write|Edit",
         "hooks": [ { "type": "command",
-          "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/on_room_edit.py\"" } ] }
+          "command": "python3 \"${PLANHAUS_ROOT}/hooks/on_room_edit.py\"" } ] }
     ]
   }
 }
@@ -314,11 +314,11 @@ dominant|secondary|accent`, `visual_weight: light|medium|heavy`, `mass:` (kg), `
 
 `on_room_edit.py`: reads stdin JSON; if `tool_input.file_path` matches `rooms/*.y(a)ml` and the
 file exists, runs `room_spatial.py <file> --check --json`, then: geometry/collision **ERRORs** →
-stdout JSON `{"decision": "block", "reason": "<findings>"}` (PostToolUse "block" prompts Claude
+stdout JSON `{"decision": "block", "reason": "<findings>"}` (PostToolUse "block" prompts the agent
 to address it); WARNs only → `{"hookSpecificOutput": {"hookEventName": "PostToolUse",
 "additionalContext": "<findings>"}}`. **Any exception (missing yaml lib, bad stdin, script
 failure) → exit 0 silently** — the hook must never break editing, and must be safe whether it
-executes on host (no pyyaml) or in the Cowork VM.
+executes on host (no pyyaml) or in the the plugin host VM.
 
 ## plugin.json (v1.0.0)
 
@@ -357,7 +357,7 @@ rebuild. It is **re-thinking, not re-formatting**:
 1. **Inventory & mode** — detect 0.x markers; classify the project as *paper* (nothing
    bought → full re-think allowed) or *furnished home* (purchased/installed items →
    derive, don't redesign; moves are free, replacements are flagged costs). Back up first.
-2. **Refresh injected docs** — the project's CLAUDE.md / design-checklist.yaml /
+2. **Refresh injected docs** — the project's AGENTS.md / design-checklist.yaml /
    workflow.md were copied at scaffold time and carry pre-1.0 doctrine (hardcoded
    clearance numbers, no phase discipline). Replace if unedited, merge if edited — never
    drop user text.
@@ -379,15 +379,15 @@ they detect a v1 stamp.
 ## Versioning & release
 
 - This release: **1.0.0** (project format additions + new workflow contract).
-- Release checklist additions: `claude plugin validate . --strict`, run `--check` on
-  sample-project rooms, smoke-test in Cowork (hooks fire, MCP tools appear, forked review runs).
+- Release checklist additions: validate the plugin manifest, run `--check` on
+  sample-project rooms, smoke-test in the plugin host (hooks fire, MCP tools appear, forked review runs).
 - CHANGELOG.md maintained from this release on.
 
-## Known runtime caveats (test in Cowork before merging to main)
+## Known runtime caveats (test in the plugin host before merging to main)
 
-1. Hook execution context (host vs VM) in Cowork is not officially documented — `on_room_edit.py`
+1. Hook execution context (host vs VM) in the plugin host is not officially documented — `on_room_edit.py`
    and both SessionStart commands are written to degrade silently wherever they run.
-2. Plugin `agents/` + `context: fork` support in Cowork is documented for Claude Code; verify the
-   forked `review` works in Cowork, else it falls back to inline instructions (the skill body
+2. Plugin `agents/` + `context: fork` support is documented for the original host; verify the
+   forked `review` works in the plugin host, else it falls back to inline instructions (the skill body
    must stand alone).
-3. `userConfig` prompting in Cowork unverified — the MCP server's db_path fallback chain covers it.
+3. `userConfig` prompting in the plugin host unverified — the MCP server's db_path fallback chain covers it.

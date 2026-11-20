@@ -6,14 +6,14 @@ Reads the hook payload from stdin. If the edited file is a room spec
 (room_spatial.py <file> --check --json) and reports findings back:
 
 - any ERROR findings  -> stdout {"decision": "block", "reason": "<findings>"}
-  (PostToolUse "block" prompts Claude to address the problems)
+  (PostToolUse "block" prompts the agent to address the problems)
 - only WARN findings  -> stdout {"hookSpecificOutput": {"hookEventName":
   "PostToolUse", "additionalContext": "<findings>"}}
 - no findings         -> no output
 
 The hook must NEVER break editing: any failure (missing libs, bad stdin,
 script error, non-JSON output, timeout) exits 0 silently. It must be safe
-whether it executes on the host or in the Cowork VM.
+whether it executes on the host or in a VM.
 """
 import json
 import os
@@ -62,7 +62,7 @@ def main():
     if not room_file.exists():
         return
 
-    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT") or str(Path(__file__).resolve().parent.parent)
+    plugin_root = os.environ.get("PLANHAUS_ROOT") or str(Path(__file__).resolve().parent.parent)
     spatial = Path(plugin_root) / "scripts" / "room_spatial.py"
     if not spatial.exists():
         return

@@ -51,7 +51,7 @@ Check that a room's geometry is correct AND that the layout passes the clearance
 
 - Old projects without zones/types still validate — missing data produces SKIP, never an error.
 - If the SKIPs reveal a pre-1.0 project (no `concept.yaml`, no zones anywhere, project
-  CLAUDE.md without the PHASE DISCIPLINE section), suggest `/planhaus-migrate` — it upgrades
+  AGENTS.md without the PHASE DISCIPLINE section), suggest `/planhaus-migrate` — it upgrades
   the schemas AND retroactively derives the concept/zones the project implies.
 - Floor-level collisions only — wall-mounted (`mount: wall`) and surface items (`on: base-id`) are excluded.
 - Passing validation means geometry and clearances are correct, NOT that the design is good — that's `/planhaus-review`.

@@ -2,7 +2,7 @@
 """Local server for the 3D viewer: serves viewer/ and writes edits made in the viewer back into the room YAML.
 
 Usage (from the repo root):
-    py -3.11 tools/room3d/serve.py [--port 8765] [--bind 127.0.0.1]
+    py -3.11 tools/room3d/serve.py [--open] [--port 8765] [--bind 127.0.0.1]
 
   GET  /<room>.html   the viewer; rebuilt first when rooms/<room>.yaml, apartment.yaml, the template or the builder is newer
   GET  /api/ping      lets the viewer know that saving to the server works
@@ -20,9 +20,11 @@ import re
 import subprocess
 import sys
 import threading
+import webbrowser
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.request import urlopen
 
 import yaml
 
@@ -30,11 +32,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent                       # repo root
 VIEWER = ROOT / "viewer"
 LOCK = threading.Lock()                          # one save / rebuild at a time
+PING = {"ok": True, "project": "kitchen-planner"}
 
 NUMBERS = {"position", "gap", "elevation", "rotation", "width", "depth", "height", "top",
            "rails", "rail_width", "rail_thickness", "shelves", "board", "plinth", "leg", "sill", "mullion", "doors", "panel", "stand",
            "lumens", "lumens_m", "kelvin", "beam",
-           "illuminance", "altitude", "azimuth", "luminance", "overcast", "kelvin_overcast", "reflectance"}
+           "illuminance", "altitude", "azimuth", "luminance", "overcast", "kelvin_overcast", "reflectance", "smooth_angle"}
 COLORS = {"facade", "carcass", "worktop", "color", "inner"}
 BOOLS = {"led", "shadow"}                                 # on / off switches: true | false
 CHOICES = {"finish": {"fabric", "wood", "plastic", "paint", "satin", "gloss", "metal", "chrome", "stone"}}   # a word from a list
@@ -64,6 +67,12 @@ def split_value(rest):
 
 
 def fmt(v, key):
+    if key == "variant":
+        if not isinstance(v, str) or not re.fullmatch(r"[a-z][a-z0-9-]*", v):
+            raise BadRequest("variant: invalid variant id")
+        return json.dumps(v)
+    if key == "smooth_angle" and (type(v) not in (int, float) or not 1 <= v <= 180):
+        raise BadRequest(f"{key}: expected an angle from 1 to 180 degrees")
     if isinstance(v, bool) and key in BOOLS:
         return "true" if v else "false"
     if isinstance(v, bool) or not isinstance(v, (int, float, str)):
@@ -204,7 +213,11 @@ def apply_changes(room_id, changes):
                 raise BadRequest(f"bad field {k!r}")
             start, end, ind = find_item(L, lo, hi, item_id)
             ykey = YAML_KEY.get(k, k) if kind == "window" else k
-            if k in NUMBERS or k in COLORS or k in BOOLS or k in CHOICES:
+            if k in NUMBERS or k in COLORS or k in BOOLS or k in CHOICES or k == "variant":
+                if k == "variant" and new is not None:
+                    item = yaml.safe_load("".join(L[start:end]))[0]
+                    if sets[k] not in (item.get("variants") or {}):
+                        raise BadRequest(f"{item_id}: unknown variant {sets[k]!r}")
                 shift = patch_item(L, start, end, ind, ykey, new)
                 hi += shift
             elif new is not None and not patch_param(L, start, end, k, new):
@@ -229,6 +242,7 @@ def stale(html, room_yaml):
     if not html.is_file():
         return True
     srcs = [room_yaml, ROOT / "apartment.yaml", HERE / "viewer_template.html", HERE / "render_mode.js", HERE / "build_room_3d.py"]
+    srcs.extend((ROOT / "assets" / "textures").glob("*.jpg"))
     return any(s.is_file() and s.stat().st_mtime > html.stat().st_mtime for s in srcs)
 
 
@@ -260,7 +274,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
         if path == "/api/ping":
-            return self.reply(200, {"ok": True})
+            return self.reply(200, PING)
         name = path.lstrip("/")
         room_yaml = ROOT / "rooms" / (Path(name).stem + ".yaml")
         if name.endswith(".html") and "/" not in name and room_yaml.is_file():
@@ -294,18 +308,43 @@ class Handler(SimpleHTTPRequestHandler):
             return self.reply(500, {"ok": False, "error": str(e)})
 
 
+def planner_is_running(base_url):
+    try:
+        with urlopen(f"{base_url}/api/ping", timeout=1) as response:
+            return json.load(response) == PING
+    except (OSError, ValueError):
+        return False
+
+
+def open_planner(url):
+    print(f"Opening {url}", flush=True)
+    if not webbrowser.open(url, new=2):
+        print(f"Open this address in your browser: {url}", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--bind", default="127.0.0.1")
+    ap.add_argument("--open", action="store_true", help="open the kitchen planner in the default browser")
     args = ap.parse_args()
+    host = "127.0.0.1" if args.bind == "0.0.0.0" else args.bind
+    base_url = f"http://{host}:{args.port}"
+    viewer_url = f"{base_url}/kitchen-living.html"
+    if args.open and args.port and planner_is_running(base_url):
+        open_planner(viewer_url)
+        return
+
     VIEWER.mkdir(exist_ok=True)
-    srv = ThreadingHTTPServer((args.bind, args.port), partial(Handler, directory=str(VIEWER)))
-    print(f"viewer: http://localhost:{args.port}/  (edits are saved into {ROOT})", flush=True)
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        pass
+    with ThreadingHTTPServer((args.bind, args.port), partial(Handler, directory=str(VIEWER))) as srv:
+        base_url = f"http://{host}:{srv.server_port}"
+        print(f"viewer: {base_url}/  (edits are saved into {ROOT})", flush=True)
+        if args.open:
+            open_planner(f"{base_url}/kitchen-living.html")
+        try:
+            srv.serve_forever()
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":

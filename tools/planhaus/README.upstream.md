@@ -1,6 +1,6 @@
 # planhaus
 
-Interior-design copilot plugin for Claude Desktop / Cowork / Claude Code.
+Interior-design copilot for planning, furnishing, and validating rooms.
 
 planhaus makes the agent reason like a professional interior designer: it follows the
 real design process instead of jumping straight to furniture placement, validates every
@@ -25,14 +25,14 @@ layout fixes dimensions.
 
 ## Install
 
-In Claude Code / Cowork:
+In the original plugin host:
 
 ```
 /plugin marketplace add pepuscz/planhaus
 /plugin install planhaus
 ```
 
-Or for local development: `claude --plugin-dir .`
+In this repository, run the bundled planning scripts directly.
 
 ## Quick start
 
@@ -141,7 +141,7 @@ It passes its own validation — use it to try every skill.
 - **`scripts/room_spatial.py`** computes coordinates, detects collisions, runs the rules
   engine, and renders floorplan PNGs.
 - **Design doctrine** (phase discipline, 60-30-10, validation rules) is injected into each
-  project via its `CLAUDE.md`.
+  project via its `AGENTS.md`.
 
 ## License
 

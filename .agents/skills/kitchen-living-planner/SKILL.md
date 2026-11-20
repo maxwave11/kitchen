@@ -37,8 +37,8 @@ If the user gives only overall dimensions, write a rectangle and mark unknowns a
 ## 2. Write and validate the room
 
 1. If `rooms/kitchen-living.yaml` does not exist, copy `tools/planhaus/templates/rooms/_template.yaml`
-   there (and `tools/planhaus/templates/CLAUDE.md` rules are already summarised in the repo
-   `CLAUDE.md`). Fill `walls`, `windows`, `openings`, `ceiling_height`, `plumbing`, `heating`,
+   there (and `tools/planhaus/templates/AGENTS.md` rules are already summarised in the repo
+   `AGENTS.md`). Fill `walls`, `windows`, `openings`, `ceiling_height`, `plumbing`, `heating`,
    `outlets`. Use `openings:` for doorways, `windows:` for glazing (balcony door = window
    with `type: balcony-door`).
 2. 3D-only optional fields (read by the 3D builder, ignored by the rules engine):
@@ -63,7 +63,7 @@ If the user gives only overall dimensions, write a rectangle and mark unknowns a
 
 ## 3. Plan the layout (planhaus phases)
 
-Follow the phase order from `CLAUDE.md`: `/planhaus-brief` (short, combine with intake) →
+Follow the phase order from `AGENTS.md`: `/planhaus-brief` (short, combine with intake) →
 `/planhaus-concept` → `/planhaus-zone` → `/planhaus-furnish` → `/planhaus-light` →
 `/planhaus-review`. Use `spatial-layout-guide` for standard furniture sizes.
 
